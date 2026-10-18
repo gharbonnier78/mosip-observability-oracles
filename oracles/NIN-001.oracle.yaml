@@ -123,8 +123,8 @@ traces:
         deployment.environment.name: {$ref: env.name}    # from the env configuration manager export
         k8s.cluster.name: {$ref: env.cluster}
         cloud.region: {$ref: env.site}                 # single-site scenario: every MOSIP span on the target site
-        acme.site.role: {$ref: env.site_role}
-        acme.env.id: {$ref: env.id}
+        oaef.site.role: {$ref: env.site_role}
+        oaef.env.id: {$ref: env.id}
         service.namespace: {$in: ["mosip", "jarvis"]}
       attributes:
         cicd.pipeline.run.id: {$ref: run.id}                     # via baggage + BaggageSpanProcessor (T1 only; T2/T3 have no baggage)
@@ -142,9 +142,9 @@ traces:
         cicd.pipeline.run.id: {$ref: run.id}
         test.case.name: "NIN-001"
         test.suite.name: "TC-NIN"
-        acme.test.persona: "adult-nohit"
-        acme.test.verdict: {$in: [PASS, PASS_OBSERVABILITY_DEFECT, INCONCLUSIVE, INFRA, SILENT_FAILURE, TEST_DATA_CONFIG, PRODUCT_BUG]}
-        test.case.result.status: {$in: [pass, fail]}     # semconv Test: pass iff acme.test.verdict == PASS
+        oaef.test.persona: "adult-nohit"
+        oaef.test.verdict: {$in: [PASS, PASS_OBSERVABILITY_DEFECT, INCONCLUSIVE, INFRA, SILENT_FAILURE, TEST_DATA_CONFIG, PRODUCT_BUG]}
+        test.case.result.status: {$in: [pass, fail]}     # semconv Test: pass iff oaef.test.verdict == PASS
         cicd.pipeline.name: {$ref: ci.pipeline.name}
       status: { code: {$in: [1, 2]} }                    # OK if PASS, ERROR otherwise (set by Jarvis)
       capture: { traceId: trace.root, spanId: span.root }

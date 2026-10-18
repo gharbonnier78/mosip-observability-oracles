@@ -64,7 +64,7 @@ Principle: **extend, don't fork.** Prefer the OpenTelemetry Java agent, its exte
 
 | ID | Requirement | Pri | Acceptance |
 |---|---|---|---|
-| WP0-TST-01 | **Jarvis test executor**: OTel SDK, ROOT span per scenario, baggage `cicd.pipeline.run.id`, `test.suite.name`, `test.case.name`, step spans, results on the ROOT span (`test.case.result.status`, `acme.test.verdict`). | M | Every scenario run has exactly one ROOT span with these attributes. |
+| WP0-TST-01 | **Jarvis test executor**: OTel SDK, ROOT span per scenario, baggage `cicd.pipeline.run.id`, `test.suite.name`, `test.case.name`, step spans, results on the ROOT span (`test.case.result.status`, `oaef.test.verdict`). | M | Every scenario run has exactly one ROOT span with these attributes. |
 | WP0-TST-02 | **Evidence collector**: settle-window logic, queries to Tempo / Loki (app and audit tenants) / Mimir / read-only DB / business APIs / Kubernetes, manifest with exact queries, SHA-256 per file, signature, upload to the evidence bucket. | M | A verdict can be recomputed from the bundle alone (replay test). |
 | WP0-TST-03 | **Oracle engine**: matcher language, JSON Schemas for oracle, persona and prerequisite files validated in CI, golden-run **record → review → freeze** workflow, verdict classification (7 classes). | M | CI rejects an invalid oracle; a golden run needs an approving review before use. |
 | WP0-TST-04 | **Release-aware oracles**: oracles declare `mosip_release` and `otel_java_agent`; a platform upgrade triggers re-recording of golden runs and a reviewed diff. | M | Running an oracle against a non-matching release fails fast with ENV_NOT_READY. |
@@ -106,7 +106,7 @@ Principle: **extend, don't fork.** Prefer the OpenTelemetry Java agent, its exte
 
 | ID | Requirement | Pri | Acceptance |
 |---|---|---|---|
-| WP0-DQ-01 | **Pinned semantic conventions** version and a published **attribute registry** (`observability/attribute-model.md`), including the organisation namespace (`acme.*` placeholder to be replaced). | M | Registry versioned; CI lint rejects unknown custom attributes. |
+| WP0-DQ-01 | **Pinned semantic conventions** version and a published **attribute registry** (`observability/attribute-model.md`), including the framework namespace `oaef.*` for attributes with no semantic convention. | M | Registry versioned; CI lint rejects unknown custom attributes. |
 | WP0-DQ-02 | **Signal contract per component** checked in CI and in each platform: a delivery is not "done" until its contract passes. | M | Contract job part of every work package's Definition of Done. |
 | WP0-DQ-03 | **Cardinality budget**: metric label whitelist (env, site, cluster, service, route, status); no IDs as metric labels. | M | Active series per service under [budget]. |
 | WP0-DQ-04 | **Sampling policy** per platform (section 1), with test-tagged traffic always kept. | M | No test-tagged trace missing in Tempo (pipeline-health check). |
@@ -136,10 +136,11 @@ Dependency for other work packages: **passing the signal contract (WP0-DQ-02) is
 
 ## 10. Open decisions
 
+Resolved on 2026-10-18: site attribute = `cloud.region` (`dc1`, `dc2`), DR role = `oaef.site.role`; namespace for attributes with no semantic convention = `oaef.*`.
+
 1. Which environment configuration manager product, and who owns its records.
 2. Tenant model: one shared stack with tenants per platform class (proposed) or one stack per platform.
 3. MOSIP changes that cannot be done by extension (audit trace id columns, credential traceparent): local patch, fork policy, upstream contribution.
 4. ABIS vendor: can it propagate `traceparent` through its queues, or is the boundary a span link only?
-5. Organisation attribute namespace replacing `acme.*`.
-6. Retention durations and capacity figures (all bracketed values).
-7. Whether this repository stays public (see WP0-SEC-09).
+5. Retention durations and capacity figures (all bracketed values).
+6. Whether this repository stays public (see WP0-SEC-09).

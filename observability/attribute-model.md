@@ -37,24 +37,24 @@ Goal: every trace, log and metric can be filtered by **test environment** and **
 | `test.suite.run.status` | suite span | `success`, `failure`, … | Jarvis | Test |
 
 **Site = `cloud.region` (decision).** Semantic conventions have no "site" or "data centre" attribute. `cloud.region` is defined for cloud-provider regions; we reuse it for on-premises sites because it is standard, recognised by tools, and **indexed by default by Loki** for OTLP (no custom index label needed). Rules that keep this safe:
-- Values are the **location only**: `dc1`, `dc2`. Never `drs` or `dr`: disaster recovery is a **role**, carried by `acme.site.role` (`primary`, `dr`), which changes on failover while the location does not.
+- Values are the **location only**: `dc1`, `dc2`. Never `drs` or `dr`: disaster recovery is a **role**, carried by `oaef.site.role` (`primary`, `dr`), which changes on failover while the location does not.
 - `cloud.provider` is **not set** (its values are cloud vendors only).
 - The collector site stamp is authoritative (upsert), so a cloud resource detector can never overwrite `cloud.region`.
-- If a site is ever hosted by a cloud provider, the convention is revisited (open decision D5).
+- If a site is ever hosted by a cloud provider, this convention must be revisited.
 
-**Migration from earlier drafts:** `acme.site.name` → `cloud.region` (values lower-cased); `test.run.id` → `cicd.pipeline.run.id`; `test.case.id` → `test.case.name`; `test.suite` → `test.suite.name`. Never invent keys inside a namespace owned by semconv (`test.*`, `deployment.*`, `k8s.*` …): a future semconv release could define them differently.
+**Migration from earlier drafts:** `oaef.site.name` → `cloud.region` (values lower-cased); `test.run.id` → `cicd.pipeline.run.id`; `test.case.id` → `test.case.name`; `test.suite` → `test.suite.name`. Never invent keys inside a namespace owned by semconv (`test.*`, `deployment.*`, `k8s.*` …): a future semconv release could define them differently.
 
 ### 2.2 No semconv exists → organisation namespace
 
-Semconv naming rules: custom attributes must live in a namespace you own (reverse domain or company prefix). Below, `acme.` is a placeholder — replace with your organisation prefix once and for all.
+Semconv naming rules: custom attributes must live in a namespace you own. **Decision (2026-10-18): `oaef.*`**, the namespace of the Observability and Audit Evidence Framework: neutral with respect to the organisation and the programme, so the framework can be reused. Business keys of the MOSIP domain keep `mosip.*`.
 
 | Attribute | Level | Example | Source |
 |---|---|---|---|
-| `acme.site.role` | resource | `primary`, `dr` | env config manager (changes on failover) |
-| `acme.env.id` | resource | CMDB CI id `ENV-000123` | env config manager |
-| `acme.env.config.version` | resource | snapshot id / hash of the env definition | env config sync job |
-| `acme.test.verdict` | ROOT span | `PASS`, `INFRA`, `PRODUCT_BUG`, … (richer than `test.case.result.status`) | Jarvis |
-| `acme.test.persona` | ROOT span | `adult-nohit` | Jarvis |
+| `oaef.site.role` | resource | `primary`, `dr` | env config manager (changes on failover) |
+| `oaef.env.id` | resource | CMDB CI id `ENV-000123` | env config manager |
+| `oaef.env.config.version` | resource | snapshot id / hash of the env definition | env config sync job |
+| `oaef.test.verdict` | ROOT span | `PASS`, `INFRA`, `PRODUCT_BUG`, … (richer than `test.case.result.status`) | Jarvis |
+| `oaef.test.persona` | ROOT span | `adult-nohit` | Jarvis |
 | `mosip.rid` | span + log | 29-digit RID | INST-01 extension |
 
 ## 3. Flow of values: environment configuration manager → telemetry
@@ -75,14 +75,14 @@ env-config-sync job ──► Git (GitOps repo) ──► Argo CD / Helm
 | Backend | How env/site arrive | Filter example |
 |---|---|---|
 | Tempo | resource attributes on every span | TraceQL `{ resource.deployment.environment.name = "test-int" && resource.cloud.region = "dc2" }` |
-| Loki | resource attributes → **index labels** for the default list (incl. `deployment.environment.name`, `k8s.cluster.name`, `cloud.region`, `service.name`, `k8s.namespace.name`); only the custom `acme.site.role` must be added as index label (low cardinality) | `{deployment_environment_name="test-int", cloud_region="dc2", service_name="regproc-pkr"}` |
+| Loki | resource attributes → **index labels** for the default list (incl. `deployment.environment.name`, `k8s.cluster.name`, `cloud.region`, `service.name`, `k8s.namespace.name`); only the custom `oaef.site.role` must be added as index label (low cardinality) | `{deployment_environment_name="test-int", cloud_region="dc2", service_name="regproc-pkr"}` |
 | Mimir / Prometheus | resource attributes go to `target_info` only, **unless promoted** to series labels | `http_server_request_duration_seconds_count{deployment_environment_name="test-int", cloud_region="dc1"}` |
 | Grafana | dashboard variables `$env`, `$site` from label values; data links keep them | — |
 
-Cardinality: env, site, role, cluster are low-cardinality (< 50 values) → safe as labels. `acme.env.config.version` stays a resource attribute only (not a metric label).
+Cardinality: env, site, role, cluster are low-cardinality (< 50 values) → safe as labels. `oaef.env.config.version` stays a resource attribute only (not a metric label).
 
 ## 5. DR / multi-site specifics
 
 - Same `service.name` on both sites; the site is told apart by `cloud.region` + `k8s.cluster.name`.
-- `acme.site.role` flips on failover (`cloud.region=dc2`: `dr → primary`): the env config manager is updated by the failover runbook, the sync job re-stamps the collectors → evidence shows which site was primary at test time.
+- `oaef.site.role` flips on failover (`cloud.region=dc2`: `dr → primary`): the env config manager is updated by the failover runbook, the sync job re-stamps the collectors → evidence shows which site was primary at test time.
 - Cross-site calls (replication, DR routing) appear as parent/child spans with different `cloud.region` — this is what DR test oracles assert (see NIN-080…082).

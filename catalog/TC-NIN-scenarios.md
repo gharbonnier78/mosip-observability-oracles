@@ -79,7 +79,7 @@ Every scenario can run with `--env <env>@<site>`; site-specific expectations com
 
 | ID | Scenario | Expected signals (env/site) | Expected verdict class |
 |---|---|---|---|
-| NIN-080 | NIN-001 executed against DC2 after planned failover | all MOSIP spans/logs/metrics carry `cloud.region=dc2`, `acme.site.role=primary`; none from DC1 | PASS |
+| NIN-080 | NIN-001 executed against DC2 after planned failover | all MOSIP spans/logs/metrics carry `cloud.region=dc2`, `oaef.site.role=primary`; none from DC1 | PASS |
 | NIN-081 | Failover **during** processing (packet uploaded on DC1, stages finish on DC2) | trace T1 contains spans of both sites; first site change after the last DC1 stage; same RID, one UIN, no duplicate `UIN_GENERATOR` transaction | PASS (resilience) |
 | NIN-082 | Data replication check DC1 → DC2 | identity readable on DC2 (`GET idvid/${uin}` with DC2 endpoint) within RPO; replication lag metric ≤ RPO | PASS / INFRA if RPO exceeded |
 | NIN-083 | Mis-stamped collector (DC2 cluster labelled DC1) | env-manager vs collector drift detected by ENV-02 | ENV_NOT_READY (scenario not run) |

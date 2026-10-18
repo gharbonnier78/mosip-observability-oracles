@@ -18,7 +18,7 @@ mosip-observability-oracles/
 ├── data/personas/adult-nohit.persona.yaml # data contract for the fake-data generator (MOSIP ID-schema compliant)
 ├── prerequisites/env-nin-baseline.yaml    # environment (resolved from the env configuration manager), masterdata, keys, partners, mocks, observability settings
 ├── observability/
-│   ├── attribute-model.md                 # env / site / test attributes on OTel semantic conventions (+ acme.* where none exists)
+│   ├── attribute-model.md                 # env / site / test attributes on OTel semantic conventions (+ oaef.* where none exists)
 │   ├── env-site-injection.yaml            # env manager -> namespace annotations, OTel Operator, collector site stamp
 │   └── backends-env-site.yaml             # Loki index labels, Mimir resource-attribute promotion, Tempo columns, Grafana variables
 └── (to add) schemas/*.schema.json         # JSON Schemas validating persona / oracle / prerequisites files in CI

@@ -31,7 +31,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
 <tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft: generic layer, IaC deployment, qualification layer, MOSIP NIN reference implementation.</td></tr>
-<tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2) replaces acme.site.name; role kept in acme.site.role.</td></tr>
+<tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2); DR role oaef.site.role; namespace oaef.* (former open decision D5 resolved).</td></tr>
 </table>
 <h4>Approvals</h4>
 <table>
@@ -106,7 +106,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <li>Priority: <b>M</b> must, <b>S</b> should, <b>C</b> could.</li>
 <li>Verification method: <b>T</b> test, <b>D</b> demonstration, <b>I</b> inspection, <b>A</b> analysis. Each requirement is verified by at least one test case of [R9].</li>
 <li>Values in <b>[brackets]</b> and items marked <b>[A]</b> are assumptions or parameters to be agreed; none is a measured value.</li>
-<li>The organisation attribute namespace is written <code>acme.*</code> as a placeholder until decided.</li>
+<li>Attributes with no semantic convention use the framework namespace <code>oaef.*</code> (decision of 2026-10-18).</li>
 </ul>
 
 <h1>2 System context</h1>
@@ -246,7 +246,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>cloud.region (physical site), cloud.availability_zone (optional)</td><td>resource</td><td>dc1, dc2; dc1-a</td><td>Environment manager. Reuse of the cloud convention for on-premises sites: location only (never a role such as DR), cloud.provider not set, value enforced by the collector stamp.</td></tr>
 <tr><td>cicd.pipeline.name, cicd.pipeline.run.id</td><td>span (baggage)</td><td>run-20261018-001</td><td>CI</td></tr>
 <tr><td>test.suite.name, test.case.name, test.case.result.status</td><td>span</td><td>TC-NIN, NIN-001, pass</td><td>Jarvis</td></tr>
-<tr><td>acme.test.verdict, acme.test.persona</td><td>ROOT span</td><td>PASS, adult-nohit</td><td>Jarvis</td></tr>
+<tr><td>oaef.test.verdict, oaef.test.persona</td><td>ROOT span</td><td>PASS, adult-nohit</td><td>Jarvis</td></tr>
 <tr><td>mosip.rid, mosip.uin_hash, mosip.vid_hash, mosip.request_id, mosip.partner_id, mosip.reg_type, mosip.stage</td><td>span, log</td><td>29-digit RID; salted hash</td><td>MOSIP extension</td></tr>
 <tr><td>HTTP, database, messaging attributes</td><td>span</td><td>http.response.status_code, db.namespace, messaging.destination.name</td><td>Agent (semantic conventions)</td></tr>
 </table>
@@ -377,7 +377,7 @@ exporters:
 <p class="note">Configuration excerpts are references; exact keys must be checked against the pinned collector and backend versions.</p>
 <h3>6.4.4 Backends</h3>
 <ul>
-<li>Loki: <code>cloud.region</code> is a default OTLP index label; add <code>acme.site.role</code>; tenants app and audit; retention per platform.</li>
+<li>Loki: <code>cloud.region</code> is a default OTLP index label; add <code>oaef.site.role</code>; tenants app and audit; retention per platform.</li>
 <li>Mimir: promotion of <code>deployment.environment.name</code>, <code>k8s.cluster.name</code>, <code>cloud.region</code>, <code>service.namespace</code> to series labels.</li>
 <li>Tempo: dedicated columns for environment, site, <code>mosip.rid</code>, <code>test.case.name</code>.</li>
 </ul>
@@ -553,15 +553,15 @@ exporters:
 <!--RTM-->
 
 <h1>12 Open issues and decisions</h1>
+<p>Resolved on 2026-10-18: the site attribute is <code>cloud.region</code> (<code>dc1</code>, <code>dc2</code>); the disaster-recovery role is <code>oaef.site.role</code>; attributes with no semantic convention use the framework namespace <code>oaef.*</code>.</p>
 <table>
 <tr><th style="width:8%">ID</th><th>Decision required</th></tr>
 <tr><td>D1</td><td>Environment configuration manager product and record ownership.</td></tr>
 <tr><td>D2</td><td>Tenant model: shared stack with tenants per platform class (proposed) or one stack per platform.</td></tr>
 <tr><td>D3</td><td>Handling of MOSIP code changes not achievable by extension (audit trace id, credential traceparent, packet traceparent).</td></tr>
 <tr><td>D4</td><td>ABIS vendor propagation of trace context, or span link boundary.</td></tr>
-<tr><td>D5</td><td>Organisation attribute namespace replacing acme.*.</td></tr>
-<tr><td>D6</td><td>Retention, capacity and threshold values (all bracketed values).</td></tr>
-<tr><td>D7</td><td>Publication status of the specification repository.</td></tr>
+<tr><td>D5</td><td>Retention, capacity and threshold values (all bracketed values).</td></tr>
+<tr><td>D6</td><td>Publication status of the specification repository.</td></tr>
 </table>
 
 <h1>Annex A — Repository index</h1>

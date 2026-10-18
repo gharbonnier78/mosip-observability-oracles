@@ -15,10 +15,10 @@ Feature: NIN issuance for a new adult resident with no deduplication hit
   Background:
     Given the target environment "${cli.env}" is resolved from the environment configuration manager
       | variable      | example      | telemetry attribute          |
-      | env.id        | ENV-000123   | acme.env.id                  |
+      | env.id        | ENV-000123   | oaef.env.id                  |
       | env.name      | test-int     | deployment.environment.name  |
       | env.site      | dc1          | cloud.region                 |
-      | env.site_role | primary      | acme.site.role               |
+      | env.site_role | primary      | oaef.site.role               |
       | env.cluster   | dc1-k8s-test | k8s.cluster.name             |
     And the environment satisfies prerequisites "env-nin-baseline"
     And the collectors of cluster "${env.cluster}" stamp environment "${env.name}" and site "${env.site}"
@@ -90,4 +90,4 @@ Feature: NIN issuance for a new adult resident with no deduplication hit
     And oracle section "audit" holds
     And oracle section "nfr" holds
     And the signal-contract coverage is 100 percent
-    And the verdict is "PASS" and is written to the ROOT span attribute "acme.test.verdict"
+    And the verdict is "PASS" and is written to the ROOT span attribute "oaef.test.verdict"

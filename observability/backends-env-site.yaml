@@ -12,7 +12,7 @@ loki:
       resource_attributes:
         attributes_config:
           - action: index_label
-            attributes: [acme.site.role]                # cloud.region is already a default OTLP index label
+            attributes: [oaef.site.role]                # cloud.region is already a default OTLP index label
 # query: {deployment_environment_name="test-int", cloud_region="dc2"} | trace_id="..."
 
 # ---------------------------------------------------------------------------
@@ -21,11 +21,11 @@ loki:
 # ---------------------------------------------------------------------------
 mimir:
   limits:
-    promote_otel_resource_attributes: "deployment.environment.name,k8s.cluster.name,cloud.region,acme.site.role,service.namespace"
+    promote_otel_resource_attributes: "deployment.environment.name,k8s.cluster.name,cloud.region,oaef.site.role,service.namespace"
   # CLI equivalent: -distributor.otel-promote-resource-attributes=...
   # Prometheus 3.x native OTLP receiver equivalent:
   #   otlp:
-  #     promote_resource_attributes: [deployment.environment.name, k8s.cluster.name, cloud.region, acme.site.role, service.namespace]
+  #     promote_resource_attributes: [deployment.environment.name, k8s.cluster.name, cloud.region, oaef.site.role, service.namespace]
   # If metrics go through the collector's prometheusremotewrite exporter instead, use a transform processor
   # to copy ONLY these resource attributes to datapoint attributes (avoid resource_to_telemetry_conversion: all attributes => cardinality).
 # query: sum by (cloud_region) (rate(http_server_request_duration_seconds_count{deployment_environment_name="test-int"}[5m]))
