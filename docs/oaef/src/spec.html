@@ -1,4 +1,4 @@
-﻿<html><head><meta charset="utf-8"><title>Observability and Audit Evidence Framework Specification</title>
+<html><head><meta charset="utf-8"><title>Observability and Audit Evidence Framework Specification</title>
 <style>
 body { font-family: Arial, sans-serif; font-size: 10pt; }
 h1 { font-family: Arial; color: #003088; font-size: 18pt; }
@@ -19,7 +19,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:30%">Field</th><th>Value</th></tr>
 <tr><td>Document identifier</td><td>OAEF-SPEC-001</td></tr>
-<tr><td>Version</td><td>0.1 — Draft for review</td></tr>
+<tr><td>Version</td><td>0.2 — Draft for review</td></tr>
 <tr><td>Date</td><td>2026-10-18</td></tr>
 <tr><td>Work package</td><td>WP0 — Shared observability, audit and evidence layer</td></tr>
 <tr><td>Owner</td><td>[Name, role]</td></tr>
@@ -31,6 +31,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
 <tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft: generic layer, IaC deployment, qualification layer, MOSIP NIN reference implementation.</td></tr>
+<tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2) replaces acme.site.name; role kept in acme.site.role.</td></tr>
 </table>
 <h4>Approvals</h4>
 <table>
@@ -172,7 +173,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>P1</td><td>Observability first</td><td>Signals are designed with the system, because the oracle can only expect what the system can emit.</td></tr>
 <tr><td>P2</td><td>Standards before custom</td><td>OpenTelemetry, W3C Trace Context and semantic conventions wherever they exist; organisation namespace only where none exists.</td></tr>
 <tr><td>P3</td><td>Extend, do not fork</td><td>Agent extensions and configuration rather than changes to MOSIP code.</td></tr>
-<tr><td>P4</td><td>Where is a resource fact</td><td>Environment and site are resource attributes stamped by the cluster collector, not request headers.</td></tr>
+<tr><td>P4</td><td>Where is a resource fact</td><td>Environment and site are resource attributes stamped by the cluster collector, not request headers. The site is cloud.region (location); the disaster-recovery role is a separate attribute.</td></tr>
 <tr><td>P5</td><td>Privacy by design</td><td>Identifiers are hashed; PII is denied at source and at the gateway.</td></tr>
 <tr><td>P6</td><td>Everything as code</td><td>Infrastructure, pipeline configuration, dashboards, oracles and scenarios are versioned and reviewed.</td></tr>
 <tr><td>P7</td><td>Same stores for operations and evidence</td><td>Investigation and verification read the same data, so a verdict can always be inspected.</td></tr>
@@ -221,10 +222,10 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>cicd.pipeline.run.id, test.case.name, test.suite.name</td><td>Test run and scenario</td><td>Every span of the journey (baggage)</td><td>OTel CICD and Test</td></tr>
 <tr><td>mosip.rid, mosip.uin_hash, mosip.request_id</td><td>Business object lifecycle</td><td>New traces, batches, audit, database rows</td><td>Domain namespace</td></tr>
 <tr><td>Actor ids (operator, device, user hash)</td><td>Human or technical actor</td><td>Sessions, channels, offline sync</td><td>Domain, hashed</td></tr>
-<tr><td>deployment.environment.name, k8s.cluster.name, acme.site.name</td><td>Where it happened</td><td>Everything (resource)</td><td>OTel and organisation</td></tr>
+<tr><td>deployment.environment.name, k8s.cluster.name, cloud.region</td><td>Where it happened</td><td>Everything (resource)</td><td>OTel semantic conventions</td></tr>
 </table>
 <h2>3.6 Multi-environment and multi-site view</h2>
-<p>Each site runs its own collection, pipeline and storage stack; evidence and audit buckets replicate from DC1 to DC2. Environment and site identity come from the environment configuration manager, are rendered into GitOps, and are enforced by the collector agent of each cluster (upsert of resource attributes). Cross-site calls appear as parent and child spans with different <code>acme.site.name</code>, which disaster-recovery oracles assert.</p>
+<p>Each site runs its own collection, pipeline and storage stack; evidence and audit buckets replicate from DC1 to DC2. Environment and site identity come from the environment configuration manager, are rendered into GitOps, and are enforced by the collector agent of each cluster (upsert of resource attributes). Cross-site calls appear as parent and child spans with different <code>cloud.region</code>, which disaster-recovery oracles assert.</p>
 
 <h1>4 Data and interface specification</h1>
 <h2>4.1 Signal types and encoding</h2>
@@ -242,7 +243,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>service.name, service.namespace, service.version, service.instance.id</td><td>resource</td><td>regproc-pkr, mosip, 1.2.0.1</td><td>Deployment, operator</td></tr>
 <tr><td>deployment.environment.name</td><td>resource</td><td>test-int</td><td>Environment manager</td></tr>
 <tr><td>k8s.cluster.name, k8s.namespace.name, k8s.pod.name</td><td>resource</td><td>dc1-k8s-test</td><td>Environment manager, k8sattributes</td></tr>
-<tr><td>acme.site.name, acme.site.role, acme.env.id, acme.env.config.version</td><td>resource</td><td>DC1, primary, ENV-000123</td><td>Environment manager</td></tr>
+<tr><td>cloud.region (physical site), cloud.availability_zone (optional)</td><td>resource</td><td>dc1, dc2; dc1-a</td><td>Environment manager. Reuse of the cloud convention for on-premises sites: location only (never a role such as DR), cloud.provider not set, value enforced by the collector stamp.</td></tr>
 <tr><td>cicd.pipeline.name, cicd.pipeline.run.id</td><td>span (baggage)</td><td>run-20261018-001</td><td>CI</td></tr>
 <tr><td>test.suite.name, test.case.name, test.case.result.status</td><td>span</td><td>TC-NIN, NIN-001, pass</td><td>Jarvis</td></tr>
 <tr><td>acme.test.verdict, acme.test.persona</td><td>ROOT span</td><td>PASS, adult-nohit</td><td>Jarvis</td></tr>
@@ -343,7 +344,7 @@ spec:
       service.namespace: mosip
       deployment.environment.name: test-int      # generated
       k8s.cluster.name: dc1-k8s-test             # generated
-      acme.site.name: DC1                        # generated
+      cloud.region: dc1                          # generated
   java:
     env:
       - { name: OTEL_SEMCONV_STABILITY_OPT_IN, value: database }
@@ -356,7 +357,7 @@ spec:
     attributes:
       - { key: deployment.environment.name, value: test-int, action: upsert }
       - { key: k8s.cluster.name,            value: dc1-k8s-test, action: upsert }
-      - { key: acme.site.name,              value: DC1, action: upsert }
+      - { key: cloud.region,                value: dc1, action: upsert }
 service:
   pipelines:
     traces:  { receivers: [otlp], processors: [memory_limiter, k8sattributes, resource/site-stamp, batch], exporters: [otlp/gateway] }</pre>
@@ -370,14 +371,14 @@ service:
   redaction/pii: { blocked_values: ["[0-9]{10,11}", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+"] }   # illustrative patterns
   routing/audit: route log records with attribute stream=mosip-audit to the audit exporter
 connectors:
-  spanmetrics: { resource_metrics_key_attributes: [service.name, deployment.environment.name, acme.site.name] }
+  spanmetrics: { resource_metrics_key_attributes: [service.name, deployment.environment.name, cloud.region] }
 exporters:
   otlp/tempo, otlphttp/loki-app (X-Scope-OrgID: app), otlphttp/loki-audit (X-Scope-OrgID: audit), otlphttp/mimir</pre>
 <p class="note">Configuration excerpts are references; exact keys must be checked against the pinned collector and backend versions.</p>
 <h3>6.4.4 Backends</h3>
 <ul>
-<li>Loki: OTLP index labels for <code>acme.site.name</code>, <code>acme.site.role</code> in addition to defaults; tenants app and audit; retention per platform.</li>
-<li>Mimir: promotion of <code>deployment.environment.name</code>, <code>k8s.cluster.name</code>, <code>acme.site.name</code>, <code>service.namespace</code> to series labels.</li>
+<li>Loki: <code>cloud.region</code> is a default OTLP index label; add <code>acme.site.role</code>; tenants app and audit; retention per platform.</li>
+<li>Mimir: promotion of <code>deployment.environment.name</code>, <code>k8s.cluster.name</code>, <code>cloud.region</code>, <code>service.namespace</code> to series labels.</li>
 <li>Tempo: dedicated columns for environment, site, <code>mosip.rid</code>, <code>test.case.name</code>.</li>
 </ul>
 <h2>6.5 Environment and site stamping</h2>
@@ -510,7 +511,7 @@ exporters:
 </table>
 <h3>8.5.4 Oracle extract</h3>
 <pre>- alias: IDGEN_GET_SERVER
-  resource: { service.name: idgenerator, acme.site.name: ${env.site} }
+  resource: { service.name: idgenerator, cloud.region: ${env.site} }
   name: {$re: "^GET (/v1/idgenerator)?/uin$"}
   kind: 2                       # SERVER
   parent: UINGEN_GET_UIN_CLIENT

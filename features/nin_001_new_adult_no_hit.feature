@@ -17,7 +17,7 @@ Feature: NIN issuance for a new adult resident with no deduplication hit
       | variable      | example      | telemetry attribute          |
       | env.id        | ENV-000123   | acme.env.id                  |
       | env.name      | test-int     | deployment.environment.name  |
-      | env.site      | DC1          | acme.site.name               |
+      | env.site      | dc1          | cloud.region                 |
       | env.site_role | primary      | acme.site.role               |
       | env.cluster   | dc1-k8s-test | k8s.cluster.name             |
     And the environment satisfies prerequisites "env-nin-baseline"

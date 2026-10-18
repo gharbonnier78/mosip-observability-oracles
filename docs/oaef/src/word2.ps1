@@ -36,7 +36,7 @@ try {
   }
   L 'toc'
   $sec = $d.Sections.Item(1); $sec.PageSetup.DifferentFirstPageHeaderFooter = -1
-  $hdr = $sec.Headers.Item(1).Range; $hdr.Text = "$Title  |  $DocId v0.1 Draft"; $hdr.Font.Size = [single]8
+  $hdr = $sec.Headers.Item(1).Range; $hdr.Text = "$Title  |  $DocId v0.2 Draft"; $hdr.Font.Size = [single]8
   $ftr = $sec.Footers.Item(1).Range; $ftr.Text = '[Classification]  |  Page PGX of PGY'; $ftr.Font.Size = [single]8
   foreach ($pair in @(@('PGX', 33), @('PGY', 26))) { $fr = $sec.Footers.Item(1).Range; if ($fr.Find.Execute($pair[0])) { $fr.Text = ''; $d.Fields.Add($fr, $pair[1]) | Out-Null } }
   L 'header-footer'

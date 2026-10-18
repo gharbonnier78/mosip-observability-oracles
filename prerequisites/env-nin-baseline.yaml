@@ -15,7 +15,7 @@ environment:                            # resolved at runtime from the env confi
   bind:                                 # variables used by features / oracles
     env.id:        "$.id"               # -> acme.env.id
     env.name:      "$.name"             # -> deployment.environment.name
-    env.site:      "$.site.code"        # -> acme.site.name  (DC1, DC2)
+    env.site:      "$.site.code"        # -> cloud.region  (dc1, dc2; lower case)
     env.site_role: "$.site.role"        # -> acme.site.role  (primary, dr)
     env.cluster:   "$.k8s.cluster"      # -> k8s.cluster.name
     env.snapshot:  "$.version"          # -> acme.env.config.version (stored in the evidence manifest)
@@ -24,13 +24,13 @@ environment:                            # resolved at runtime from the env confi
     service.name: jarvis-e2e
     service.namespace: jarvis
     deployment.environment.name: "${env.name}"
-    acme.site.name: "${env.site}"
+    cloud.region: "${env.site}"
     k8s.cluster.name: "${env.cluster}"
     acme.env.id: "${env.id}"
   checks:
     - { id: ENV-01, desc: "env record status is 'available/reserved for this run' in the env manager" }
     - { id: ENV-02, desc: "collector agent resource/site-stamp of ${env.cluster} has env.name / env.site equal to the env manager record (config drift check)" }
-    - { id: ENV-03, promql: 'count(target_info{deployment_environment_name="${env.name}", acme_site_name="${env.site}", service_namespace="mosip"})', expect: ">= number of components" }
+    - { id: ENV-03, promql: 'count(target_info{deployment_environment_name="${env.name}", cloud_region="${env.site}", service_namespace="mosip"})', expect: ">= number of components" }
 
 platform:
   mosip_release: "1.2.0.x"            # pin exact patch; oracle values are only valid for this release

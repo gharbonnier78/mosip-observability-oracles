@@ -27,7 +27,8 @@ Goal: every trace, log and metric can be filtered by **test environment** and **
 | `k8s.cluster.name` | resource | `dc1-k8s-test` | **env config manager** | Kubernetes |
 | `k8s.namespace.name`, `k8s.pod.name`, `k8s.node.name`, `k8s.deployment.name` | resource | — | k8sattributes processor | Kubernetes |
 | `host.name` | resource | node name | resourcedetection | Host |
-| `cloud.provider`, `cloud.region`, `cloud.availability_zone` | resource | — | **only if running on a cloud provider**; do not reuse them for on-prem DCs | Cloud |
+| `cloud.region` | resource | `dc1`, `dc2` (lower case, stable) | **env config manager** — physical site, see note below | Cloud |
+| `cloud.availability_zone` | resource | `dc1-a`, `dc1-b` (hall / zone, optional) | env config manager | Cloud |
 | `cicd.pipeline.name` | span (baggage) | `mosip-e2e-nightly` | CI | CICD |
 | `cicd.pipeline.run.id` | span (baggage) | `run-20261018-001` | CI | CICD |
 | `test.suite.name` | span (baggage) | `TC-NIN` | Jarvis | Test |
@@ -35,7 +36,13 @@ Goal: every trace, log and metric can be filtered by **test environment** and **
 | `test.case.result.status` | ROOT span | `pass` / `fail` | Jarvis | Test |
 | `test.suite.run.status` | suite span | `success`, `failure`, … | Jarvis | Test |
 
-**Migration from earlier drafts:** `test.run.id` → `cicd.pipeline.run.id`; `test.case.id` → `test.case.name`; `test.suite` → `test.suite.name`. Never invent keys inside a namespace owned by semconv (`test.*`, `deployment.*`, `k8s.*` …): a future semconv release could define them differently.
+**Site = `cloud.region` (decision).** Semantic conventions have no "site" or "data centre" attribute. `cloud.region` is defined for cloud-provider regions; we reuse it for on-premises sites because it is standard, recognised by tools, and **indexed by default by Loki** for OTLP (no custom index label needed). Rules that keep this safe:
+- Values are the **location only**: `dc1`, `dc2`. Never `drs` or `dr`: disaster recovery is a **role**, carried by `acme.site.role` (`primary`, `dr`), which changes on failover while the location does not.
+- `cloud.provider` is **not set** (its values are cloud vendors only).
+- The collector site stamp is authoritative (upsert), so a cloud resource detector can never overwrite `cloud.region`.
+- If a site is ever hosted by a cloud provider, the convention is revisited (open decision D5).
+
+**Migration from earlier drafts:** `acme.site.name` → `cloud.region` (values lower-cased); `test.run.id` → `cicd.pipeline.run.id`; `test.case.id` → `test.case.name`; `test.suite` → `test.suite.name`. Never invent keys inside a namespace owned by semconv (`test.*`, `deployment.*`, `k8s.*` …): a future semconv release could define them differently.
 
 ### 2.2 No semconv exists → organisation namespace
 
@@ -43,7 +50,6 @@ Semconv naming rules: custom attributes must live in a namespace you own (revers
 
 | Attribute | Level | Example | Source |
 |---|---|---|---|
-| `acme.site.name` | resource | `DC1`, `DC2` | env config manager |
 | `acme.site.role` | resource | `primary`, `dr` | env config manager (changes on failover) |
 | `acme.env.id` | resource | CMDB CI id `ENV-000123` | env config manager |
 | `acme.env.config.version` | resource | snapshot id / hash of the env definition | env config sync job |
@@ -68,15 +74,15 @@ env-config-sync job ──► Git (GitOps repo) ──► Argo CD / Helm
 
 | Backend | How env/site arrive | Filter example |
 |---|---|---|
-| Tempo | resource attributes on every span | TraceQL `{ resource.deployment.environment.name = "test-int" && resource.acme.site.name = "DC2" }` |
-| Loki | resource attributes → **index labels** for the default list (incl. `deployment.environment.name`, `k8s.cluster.name`, `service.name`, `k8s.namespace.name`); custom `acme.site.name` must be added as index label (low cardinality) | `{deployment_environment_name="test-int", acme_site_name="DC2", service_name="regproc-pkr"}` |
-| Mimir / Prometheus | resource attributes go to `target_info` only, **unless promoted** to series labels | `http_server_request_duration_seconds_count{deployment_environment_name="test-int", acme_site_name="DC1"}` |
+| Tempo | resource attributes on every span | TraceQL `{ resource.deployment.environment.name = "test-int" && resource.cloud.region = "dc2" }` |
+| Loki | resource attributes → **index labels** for the default list (incl. `deployment.environment.name`, `k8s.cluster.name`, `cloud.region`, `service.name`, `k8s.namespace.name`); only the custom `acme.site.role` must be added as index label (low cardinality) | `{deployment_environment_name="test-int", cloud_region="dc2", service_name="regproc-pkr"}` |
+| Mimir / Prometheus | resource attributes go to `target_info` only, **unless promoted** to series labels | `http_server_request_duration_seconds_count{deployment_environment_name="test-int", cloud_region="dc1"}` |
 | Grafana | dashboard variables `$env`, `$site` from label values; data links keep them | — |
 
 Cardinality: env, site, role, cluster are low-cardinality (< 50 values) → safe as labels. `acme.env.config.version` stays a resource attribute only (not a metric label).
 
 ## 5. DR / multi-site specifics
 
-- Same `service.name` on both sites; the site is told apart by `acme.site.name` + `k8s.cluster.name`.
-- `acme.site.role` flips on failover (`DC2: dr → primary`): the env config manager is updated by the failover runbook, the sync job re-stamps the collectors → evidence shows which site was primary at test time.
-- Cross-site calls (replication, DR routing) appear as parent/child spans with different `acme.site.name` — this is what DR test oracles assert (see NIN-080…082).
+- Same `service.name` on both sites; the site is told apart by `cloud.region` + `k8s.cluster.name`.
+- `acme.site.role` flips on failover (`cloud.region=dc2`: `dr → primary`): the env config manager is updated by the failover runbook, the sync job re-stamps the collectors → evidence shows which site was primary at test time.
+- Cross-site calls (replication, DR routing) appear as parent/child spans with different `cloud.region` — this is what DR test oracles assert (see NIN-080…082).

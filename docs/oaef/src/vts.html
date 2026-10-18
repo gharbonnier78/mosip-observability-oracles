@@ -18,7 +18,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:30%">Field</th><th>Value</th></tr>
 <tr><td>Document identifier</td><td>OAEF-VTS-001</td></tr>
-<tr><td>Version</td><td>0.1 — Draft for review</td></tr>
+<tr><td>Version</td><td>0.2 — Draft for review</td></tr>
 <tr><td>Date</td><td>2026-10-18</td></tr>
 <tr><td>Test basis</td><td>OAEF-SPEC-001 — Observability and Audit Evidence Framework Specification</td></tr>
 <tr><td>Owner</td><td>[Name, role]</td></tr>
@@ -28,6 +28,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
 <tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft.</td></tr>
+<tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2).</td></tr>
 </table>
 <h4>Approvals</h4>
 <table>
@@ -177,7 +178,7 @@ curl -s -G "$MIMIR/prometheus/api/v1/query_exemplars" \
 <pre># traces: 100 test-tagged traces with 5 child spans, wrong site on purpose (stamping test)
 telemetrygen traces --otlp-endpoint $AGENT:4317 --otlp-insecure --traces 100 --child-spans 5 \
   --service regproc-pkr \
-  --otlp-attributes 'deployment.environment.name="wrong-env"' --otlp-attributes 'acme.site.name="DCX"' \
+  --otlp-attributes 'deployment.environment.name="wrong-env"' --otlp-attributes 'cloud.region="dcx"' \
   --telemetry-attributes 'test.case.name="VT-INF-03"' --telemetry-attributes 'mosip.rid="10001100010000120261018102233"'
 
 # logs: audit stream records for routing test

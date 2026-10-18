@@ -8,7 +8,7 @@
 # env_record:
 #   env_id: ENV-000123            -> acme.env.id
 #   env_name: test-int            -> deployment.environment.name
-#   site: DC1                     -> acme.site.name
+#   site: DC1                     -> cloud.region = dc1 (lower-cased)
 #   site_role: primary            -> acme.site.role
 #   cluster: dc1-k8s-test         -> k8s.cluster.name
 #   snapshot: 2026-10-18T06:00Z#9f3c1a  -> acme.env.config.version
@@ -25,10 +25,10 @@ metadata:
   name: regproc
   labels:
     acme.io/env: test-int
-    acme.io/site: DC1
+    acme.io/site: dc1
   annotations:
     resource.opentelemetry.io/deployment.environment.name: "test-int"
-    resource.opentelemetry.io/acme.site.name: "DC1"
+    resource.opentelemetry.io/cloud.region: "dc1"
     resource.opentelemetry.io/acme.site.role: "primary"
     resource.opentelemetry.io/acme.env.id: "ENV-000123"
 ---
@@ -52,7 +52,7 @@ spec:
       service.namespace: "mosip"
       deployment.environment.name: "test-int"
       k8s.cluster.name: "dc1-k8s-test"
-      acme.site.name: "DC1"
+      cloud.region: "dc1"
       acme.site.role: "primary"
       acme.env.id: "ENV-000123"
   java:
@@ -87,7 +87,7 @@ spec:
         attributes:
           - { key: deployment.environment.name, value: "test-int",          action: upsert }
           - { key: k8s.cluster.name,            value: "dc1-k8s-test",      action: upsert }
-          - { key: acme.site.name,              value: "DC1",               action: upsert }
+          - { key: cloud.region,                value: "dc1",               action: upsert }
           - { key: acme.site.role,              value: "primary",           action: upsert }
           - { key: acme.env.id,                 value: "ENV-000123",        action: upsert }
           - { key: acme.env.config.version,     value: "2026-10-18T06:00Z#9f3c1a", action: upsert }
@@ -113,7 +113,7 @@ spec:
 #     dimensions:                      # span attributes; resource attributes (env, site) are kept on the generated metrics' resource
 #       - name: http.route
 #       - name: test.case.name
-#     resource_metrics_key_attributes: [service.name, deployment.environment.name, acme.site.name]
+#     resource_metrics_key_attributes: [service.name, deployment.environment.name, cloud.region]
 #
 # Egress rule (ingress/egress gateway or API gateway): strip the `baggage` header on calls leaving the
 # trust boundary (partners, ABIS vendor, SMS/SMTP providers) and do not accept inbound `baggage` from outside.
