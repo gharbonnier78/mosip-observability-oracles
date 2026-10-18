@@ -75,6 +75,8 @@ Each check produces `{check_id, status: pass|fail|error, expected, actual, evide
 
 ## Known gaps to close before automation (honest list)
 
+The implementation requirements that close these gaps (software, infrastructure, security, test tooling, operations) are specified as work package WP0 in [`docs/wp0-shared-platform-requirements.md`](docs/wp0-shared-platform-requirements.md).
+
 | ID | Gap | Impact | Fix |
 |---|---|---|---|
 | INST-01 | MOSIP services don't put the RID on spans | `mosip.rid` span matchers fail | Java agent extension or small Spring filter / AOP setting `Span.current().setAttribute("mosip.rid", rid)` + `MDC.put`; for logs a collector `transform` can extract the RID from the body. |
