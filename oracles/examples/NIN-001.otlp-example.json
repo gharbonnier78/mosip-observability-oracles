@@ -1,0 +1,332 @@
+{
+  "_comment": "Illustrative OTLP/JSON instance (OTLP 1.x JSON mapping) of signals expected for NIN-001, matching oracles/NIN-001.oracle.yaml. IDs/times are example values; int64/uint64 fields are JSON strings per OTLP JSON encoding; traceId/spanId are lowercase hex in OTLP/JSON (Tempo's own JSON API returns base64 - normalise).",
+  "traces": {
+    "resourceSpans": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "jarvis-e2e" } },
+            { "key": "service.namespace", "value": { "stringValue": "jarvis" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test-int" } },
+            { "key": "k8s.cluster.name", "value": { "stringValue": "dc1-k8s-test" } },
+            { "key": "acme.site.name", "value": { "stringValue": "DC1" } },
+            { "key": "acme.site.role", "value": { "stringValue": "primary" } },
+            { "key": "acme.env.id", "value": { "stringValue": "ENV-000123" } },
+            { "key": "telemetry.sdk.language", "value": { "stringValue": "java" } },
+            { "key": "telemetry.sdk.name", "value": { "stringValue": "opentelemetry" } }
+          ]
+        },
+        "scopeSpans": [
+          {
+            "scope": { "name": "jarvis", "version": "1.4.0" },
+            "spans": [
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "00f067aa0ba902b7",
+                "parentSpanId": "",
+                "flags": 257,
+                "name": "NIN-001 New adult registration no hit",
+                "kind": 1,
+                "startTimeUnixNano": "1792310400000000000",
+                "endTimeUnixNano": "1792310712345000000",
+                "attributes": [
+                  { "key": "cicd.pipeline.run.id", "value": { "stringValue": "run-20261018-001" } },
+                  { "key": "test.case.name", "value": { "stringValue": "NIN-001" } },
+                  { "key": "test.suite.name", "value": { "stringValue": "TC-NIN" } },
+                  { "key": "acme.test.persona", "value": { "stringValue": "adult-nohit" } },
+                  { "key": "acme.test.verdict", "value": { "stringValue": "PASS" } }
+                ],
+                "status": { "code": 1 }
+              },
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "a1b2c3d4e5f60718",
+                "parentSpanId": "00f067aa0ba902b7",
+                "name": "step: Jarvis uploads \"10001100010000120261018102233.zip\" with \"POST /registrationprocessor/v1/packetreceiver/registrationpackets\"",
+                "kind": 1,
+                "startTimeUnixNano": "1792310405100000000",
+                "endTimeUnixNano": "1792310405900000000",
+                "attributes": [
+                  { "key": "cicd.pipeline.run.id", "value": { "stringValue": "run-20261018-001" } },
+                  { "key": "test.case.name", "value": { "stringValue": "NIN-001" } }
+                ],
+                "status": { "code": 0 }
+              },
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "b7ad6b7169203331",
+                "parentSpanId": "a1b2c3d4e5f60718",
+                "name": "POST",
+                "kind": 3,
+                "startTimeUnixNano": "1792310405120000000",
+                "endTimeUnixNano": "1792310405880000000",
+                "attributes": [
+                  { "key": "http.request.method", "value": { "stringValue": "POST" } },
+                  { "key": "url.full", "value": { "stringValue": "https://api-internal.test.mosip.local/registrationprocessor/v1/packetreceiver/registrationpackets" } },
+                  { "key": "server.address", "value": { "stringValue": "api-internal.test.mosip.local" } },
+                  { "key": "server.port", "value": { "intValue": "443" } },
+                  { "key": "network.protocol.version", "value": { "stringValue": "1.1" } },
+                  { "key": "http.response.status_code", "value": { "intValue": "200" } },
+                  { "key": "cicd.pipeline.run.id", "value": { "stringValue": "run-20261018-001" } },
+                  { "key": "test.case.name", "value": { "stringValue": "NIN-001" } }
+                ],
+                "status": { "code": 0 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "regproc-pkr" } },
+            { "key": "service.namespace", "value": { "stringValue": "mosip" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test-int" } },
+            { "key": "k8s.cluster.name", "value": { "stringValue": "dc1-k8s-test" } },
+            { "key": "acme.site.name", "value": { "stringValue": "DC1" } },
+            { "key": "acme.site.role", "value": { "stringValue": "primary" } },
+            { "key": "acme.env.id", "value": { "stringValue": "ENV-000123" } },
+            { "key": "k8s.namespace.name", "value": { "stringValue": "regproc" } },
+            { "key": "k8s.pod.name", "value": { "stringValue": "regproc-pkr-6d9f7c8b5-x2kqz" } },
+            { "key": "telemetry.sdk.language", "value": { "stringValue": "java" } },
+            { "key": "telemetry.sdk.name", "value": { "stringValue": "opentelemetry" } }
+          ]
+        },
+        "scopeSpans": [
+          {
+            "scope": { "name": "io.opentelemetry.tomcat-10.0" },
+            "spans": [
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "53995c3f42cd8ad8",
+                "parentSpanId": "b7ad6b7169203331",
+                "name": "POST /registrationprocessor/v1/packetreceiver/registrationpackets",
+                "kind": 2,
+                "startTimeUnixNano": "1792310405150000000",
+                "endTimeUnixNano": "1792310405860000000",
+                "attributes": [
+                  { "key": "http.request.method", "value": { "stringValue": "POST" } },
+                  { "key": "url.scheme", "value": { "stringValue": "http" } },
+                  { "key": "url.path", "value": { "stringValue": "/registrationprocessor/v1/packetreceiver/registrationpackets" } },
+                  { "key": "http.route", "value": { "stringValue": "/registrationprocessor/v1/packetreceiver/registrationpackets" } },
+                  { "key": "http.response.status_code", "value": { "intValue": "200" } },
+                  { "key": "network.protocol.version", "value": { "stringValue": "1.1" } },
+                  { "key": "server.address", "value": { "stringValue": "regproc-pkr.regproc" } },
+                  { "key": "client.address", "value": { "stringValue": "10.42.3.17" } },
+                  { "key": "mosip.rid", "value": { "stringValue": "10001100010000120261018102233" } },
+                  { "key": "cicd.pipeline.run.id", "value": { "stringValue": "run-20261018-001" } },
+                  { "key": "test.case.name", "value": { "stringValue": "NIN-001" } }
+                ],
+                "status": { "code": 0 }
+              }
+            ]
+          },
+          {
+            "scope": { "name": "io.opentelemetry.jdbc" },
+            "spans": [
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "7a085853722dc6d2",
+                "parentSpanId": "53995c3f42cd8ad8",
+                "name": "INSERT mosip_regprc.registration",
+                "kind": 3,
+                "startTimeUnixNano": "1792310405700000000",
+                "endTimeUnixNano": "1792310405712000000",
+                "attributes": [
+                  { "key": "db.system.name", "value": { "stringValue": "postgresql" } },
+                  { "key": "db.namespace", "value": { "stringValue": "mosip_regprc" } },
+                  { "key": "db.operation.name", "value": { "stringValue": "INSERT" } },
+                  { "key": "db.collection.name", "value": { "stringValue": "registration" } },
+                  { "key": "db.query.text", "value": { "stringValue": "insert into registration (reg_id, reg_type, status_code, ...) values (?, ?, ?, ...)" } },
+                  { "key": "server.address", "value": { "stringValue": "postgres.postgres" } },
+                  { "key": "server.port", "value": { "intValue": "5432" } }
+                ],
+                "status": { "code": 0 }
+              }
+            ]
+          },
+          {
+            "scope": { "name": "io.opentelemetry.vertx-kafka-client-3.6" },
+            "spans": [
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "c4e3a1f0b2d39e11",
+                "parentSpanId": "53995c3f42cd8ad8",
+                "name": "packet-receiver-bus-out publish",
+                "kind": 4,
+                "startTimeUnixNano": "1792310405800000000",
+                "endTimeUnixNano": "1792310405806000000",
+                "attributes": [
+                  { "key": "messaging.system", "value": { "stringValue": "kafka" } },
+                  { "key": "messaging.operation", "value": { "stringValue": "publish" } },
+                  { "key": "messaging.destination.name", "value": { "stringValue": "packet-receiver-bus-out" } },
+                  { "key": "messaging.client_id", "value": { "stringValue": "producer-1" } }
+                ],
+                "status": { "code": 0 }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "regproc-group1" } },
+            { "key": "service.namespace", "value": { "stringValue": "mosip" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test-int" } },
+            { "key": "k8s.cluster.name", "value": { "stringValue": "dc1-k8s-test" } },
+            { "key": "acme.site.name", "value": { "stringValue": "DC1" } },
+            { "key": "acme.site.role", "value": { "stringValue": "primary" } },
+            { "key": "acme.env.id", "value": { "stringValue": "ENV-000123" } },
+            { "key": "k8s.namespace.name", "value": { "stringValue": "regproc" } },
+            { "key": "k8s.pod.name", "value": { "stringValue": "regproc-group1-5c7b9d6f4-h8m2p" } }
+          ]
+        },
+        "scopeSpans": [
+          {
+            "scope": { "name": "io.opentelemetry.vertx-kafka-client-3.6" },
+            "spans": [
+              {
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "e9f1d2c3b4a59687",
+                "parentSpanId": "c4e3a1f0b2d39e11",
+                "name": "packet-receiver-bus-out process",
+                "kind": 5,
+                "startTimeUnixNano": "1792310405950000000",
+                "endTimeUnixNano": "1792310409870000000",
+                "attributes": [
+                  { "key": "messaging.system", "value": { "stringValue": "kafka" } },
+                  { "key": "messaging.operation", "value": { "stringValue": "process" } },
+                  { "key": "messaging.destination.name", "value": { "stringValue": "packet-receiver-bus-out" } },
+                  { "key": "messaging.kafka.consumer.group", "value": { "stringValue": "regproc-group1" } },
+                  { "key": "messaging.destination.partition.id", "value": { "stringValue": "0" } },
+                  { "key": "messaging.kafka.message.offset", "value": { "intValue": "18342" } },
+                  { "key": "mosip.rid", "value": { "stringValue": "10001100010000120261018102233" } },
+                  { "key": "cicd.pipeline.run.id", "value": { "stringValue": "run-20261018-001" } },
+                  { "key": "test.case.name", "value": { "stringValue": "NIN-001" } }
+                ],
+                "status": { "code": 0 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "logs": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "regproc-pkr" } },
+            { "key": "service.namespace", "value": { "stringValue": "mosip" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test-int" } },
+            { "key": "k8s.cluster.name", "value": { "stringValue": "dc1-k8s-test" } },
+            { "key": "acme.site.name", "value": { "stringValue": "DC1" } },
+            { "key": "acme.site.role", "value": { "stringValue": "primary" } },
+            { "key": "acme.env.id", "value": { "stringValue": "ENV-000123" } },
+            { "key": "k8s.namespace.name", "value": { "stringValue": "regproc" } },
+            { "key": "k8s.pod.name", "value": { "stringValue": "regproc-pkr-6d9f7c8b5-x2kqz" } }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "scope": { "name": "io.mosip.registration.processor.packet.receiver.service.impl.PacketReceiverServiceImpl" },
+            "logRecords": [
+              {
+                "timeUnixNano": "1792310405690000000",
+                "observedTimeUnixNano": "1792310405690412000",
+                "severityNumber": 9,
+                "severityText": "INFO",
+                "body": { "stringValue": "SESSIONID - REGISTRATIONID - 10001100010000120261018102233 - PacketReceiverServiceImpl::storePacket()::exit" },
+                "attributes": [
+                  { "key": "thread.name", "value": { "stringValue": "http-nio-8081-exec-4" } },
+                  { "key": "thread.id", "value": { "intValue": "57" } },
+                  { "key": "mosip.rid", "value": { "stringValue": "10001100010000120261018102233" } }
+                ],
+                "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                "spanId": "53995c3f42cd8ad8",
+                "flags": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "metrics": {
+    "resourceMetrics": [
+      {
+        "resource": {
+          "attributes": [
+            { "key": "service.name", "value": { "stringValue": "regproc-pkr" } },
+            { "key": "service.namespace", "value": { "stringValue": "mosip" } },
+            { "key": "deployment.environment.name", "value": { "stringValue": "test-int" } },
+            { "key": "k8s.cluster.name", "value": { "stringValue": "dc1-k8s-test" } },
+            { "key": "acme.site.name", "value": { "stringValue": "DC1" } },
+            { "key": "acme.site.role", "value": { "stringValue": "primary" } },
+            { "key": "acme.env.id", "value": { "stringValue": "ENV-000123" } },
+            { "key": "service.instance.id", "value": { "stringValue": "8c1f0a52-3b7e-4c1e-9a7d-2f6b1e0c9d44" } }
+          ]
+        },
+        "scopeMetrics": [
+          {
+            "scope": { "name": "io.opentelemetry.tomcat-10.0" },
+            "metrics": [
+              {
+                "name": "http.server.request.duration",
+                "description": "Duration of HTTP server requests.",
+                "unit": "s",
+                "histogram": {
+                  "aggregationTemporality": 2,
+                  "dataPoints": [
+                    {
+                      "attributes": [
+                        { "key": "http.request.method", "value": { "stringValue": "POST" } },
+                        { "key": "http.route", "value": { "stringValue": "/registrationprocessor/v1/packetreceiver/registrationpackets" } },
+                        { "key": "http.response.status_code", "value": { "intValue": "200" } },
+                        { "key": "url.scheme", "value": { "stringValue": "http" } },
+                        { "key": "network.protocol.version", "value": { "stringValue": "1.1" } }
+                      ],
+                      "startTimeUnixNano": "1792300000000000000",
+                      "timeUnixNano": "1792310460000000000",
+                      "count": "42",
+                      "sum": 21.37,
+                      "bucketCounts": ["0", "0", "0", "0", "0", "1", "12", "20", "6", "2", "1", "0", "0", "0", "0"],
+                      "explicitBounds": [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10],
+                      "min": 0.081,
+                      "max": 1.94,
+                      "exemplars": [
+                        {
+                          "timeUnixNano": "1792310405860000000",
+                          "asDouble": 0.71,
+                          "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                          "spanId": "53995c3f42cd8ad8",
+                          "filteredAttributes": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "audit_row_example": {
+    "_table": "mosip_audit.app_audit_log",
+    "event_id": "RPR_405",
+    "event_name": "<golden>",
+    "event_type": "BUSINESS",
+    "app_id": "<golden>",
+    "app_name": "<golden>",
+    "module_id": "<golden>",
+    "module_name": "<golden>",
+    "ref_id": "10001100010000120261018102233",
+    "ref_id_type": "REGISTRATION_ID",
+    "host_name": "regproc-pkr-6d9f7c8b5-x2kqz",
+    "action_dtimes": "2026-10-18T10:00:05.700Z"
+  }
+}

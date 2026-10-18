@@ -1,0 +1,52 @@
+# Backend settings so that environment / site are first-class filters.
+
+# ---------------------------------------------------------------------------
+# Loki (OTLP ingestion): add custom low-cardinality resource attributes as index labels.
+# Defaults already index service.name, service.namespace, deployment.environment(.name),
+# cloud.region/availability_zone, k8s.cluster.name, k8s.namespace.name, k8s.pod.name, k8s.*.name ...
+# Other resource attributes become structured metadata (queryable, not indexed).
+# ---------------------------------------------------------------------------
+loki:
+  limits_config:
+    otlp_config:
+      resource_attributes:
+        attributes_config:
+          - action: index_label
+            attributes: [acme.site.name, acme.site.role]
+# query: {deployment_environment_name="test-int", acme_site_name="DC2"} | trace_id="..."
+
+# ---------------------------------------------------------------------------
+# Mimir (OTLP ingestion): promote resource attributes to labels of every series
+# (otherwise they only exist on target_info).
+# ---------------------------------------------------------------------------
+mimir:
+  limits:
+    promote_otel_resource_attributes: "deployment.environment.name,k8s.cluster.name,acme.site.name,acme.site.role,service.namespace"
+  # CLI equivalent: -distributor.otel-promote-resource-attributes=...
+  # Prometheus 3.x native OTLP receiver equivalent:
+  #   otlp:
+  #     promote_resource_attributes: [deployment.environment.name, k8s.cluster.name, acme.site.name, acme.site.role, service.namespace]
+  # If metrics go through the collector's prometheusremotewrite exporter instead, use a transform processor
+  # to copy ONLY these resource attributes to datapoint attributes (avoid resource_to_telemetry_conversion: all attributes => cardinality).
+# query: sum by (acme_site_name) (rate(http_server_request_duration_seconds_count{deployment_environment_name="test-int"}[5m]))
+
+# ---------------------------------------------------------------------------
+# Tempo: resource attributes are searchable as-is; add dedicated columns for speed.
+# ---------------------------------------------------------------------------
+tempo:
+  storage:
+    trace:
+      block:
+        parquet_dedicated_columns:
+          - { scope: resource, name: deployment.environment.name, type: string }
+          - { scope: resource, name: acme.site.name, type: string }
+          - { scope: span, name: mosip.rid, type: string }
+          - { scope: span, name: test.case.name, type: string }
+# query: { resource.deployment.environment.name = "test-int" && resource.acme.site.name = "DC2" && span.test.case.name = "NIN-001" }
+
+# ---------------------------------------------------------------------------
+# Grafana: dashboard variables (all dashboards)
+# ---------------------------------------------------------------------------
+grafana_variables:
+  env:  'label_values(target_info, deployment_environment_name)'
+  site: 'label_values(target_info{deployment_environment_name="$env"}, acme_site_name)'

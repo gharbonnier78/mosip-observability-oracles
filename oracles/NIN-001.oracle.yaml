@@ -1,0 +1,468 @@
+# Oracle for NIN-001 — deterministic, machine-checkable expectations.
+# Matcher DSL: see README.md#oracle-dsl. Key points:
+#   literal          -> exact equality (typed: int vs string matters, OTLP int64 arrive as JSON strings and are normalised)
+#   {$re: ...}       -> full-match regex          {$cap: x} -> capture value into variable x
+#   {$ref: x}        -> equals captured x         {$in: [...]} / {$gte: n} / {$lte: n}
+#   {$exists: bool}  -> key presence              {$golden: true} -> value frozen from the approved reference run
+# All IDs are normalised to lowercase hex (Tempo JSON returns base64 trace/span IDs).
+apiVersion: jarvis.test/v1
+kind: Oracle
+metadata:
+  scenario: NIN-001
+  persona: adult-nohit
+  prerequisites: env-nin-baseline
+  mosip_release: "1.2.0.x"
+  otel_java_agent: "2.x.y"           # oracle is valid only for this agent version + semconv opt-in
+  golden_run: "evidence/golden/NIN-001/<run-id>"   # reference run approved by review; $golden values come from it
+
+settle:
+  min_wait_s: 40                      # tail_sampling decision_wait (30 s) + batch + ingestion
+  stable_polls: 2                     # span count of the trace set unchanged on 2 polls...
+  poll_interval_s: 15                 # ...15 s apart
+  max_wait_s: 300                     # otherwise verdict INCONCLUSIVE (pipeline)
+
+# ---------------------------------------------------------------------------
+# 1. FUNCTIONAL RULES
+# ---------------------------------------------------------------------------
+rules:
+  uin:                                # source: kernel idgenerator properties (mosip.kernel.uin.*) read from env config at runtime
+    length: "${config.mosip.kernel.uin.length}"   # MOSIP default 10; NIMS 2.0 assumption [A]: 11 (existing NIN format) - see models/nin-requirements.md F-07
+    regex: "^[2-9][0-9]{${config.mosip.kernel.uin.length - 1}}$"   # not-start-with 0,1
+    checksum: verhoeff                # last digit
+    max_ascending_or_descending_sequence: 2     # sequence-limit=3 -> no run like 123 / 987
+    repeating_limit: 2                # same digit not repeated within 2 positions (e.g. 1x1 forbidden)
+    repeating_block_limit: 2          # no repeated block like 4848
+    restricted_numbers: "from mosip_kernel restricted list"
+    unique: "SELECT count(*) FROM mosip_kernel.uin WHERE uin='${uin}' -> 1"
+  vid:
+    length: 16
+    regex: "^[2-9][0-9]{15}$"
+    checksum: verhoeff
+    type: PERPETUAL
+  rid:
+    regex: "^1000110001[0-9]{5}[0-9]{14}$"     # center 10001 + machine 10001 + seq + yyyyMMddHHmmss (UTC)
+
+api:
+  idrepo_read:                        # GET /idrepository/v1/identity/idvid/${uin}?type=all
+    http_status: 200
+    body:
+      id: "mosip.id.read"
+      version: "v1"
+      responsetime: {$re: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"}
+      errors: null
+      response:
+        status: "ACTIVATED"
+        identity:
+          UIN: {$ref: uin}
+          IDSchemaVersion: {$ref: schema.idVersion}
+          fullName: {$ref: persona.fullName}
+          dateOfBirth: {$ref: persona.dateOfBirth}
+        documents: {$re: ".+"}        # non-empty: individualBiometrics + POA + POI expected (count checked below)
+    checks:
+      - "response.documents[*].category contains individualBiometrics, proofOfAddress, proofOfIdentity"
+      - "CBEFF individualBiometrics has 10 Finger + 2 Iris + 1 Face BIRs"
+
+db:                                   # read-only SQL via db_readonly; column names per MOSIP 1.2 DDL (verify against db_scripts)
+  regprc_registration_list:
+    sql: "SELECT reg_id, reg_type, packet_checksum, packet_size, client_status_code FROM mosip_regprc.registration_list WHERE reg_id = '${rid}'"
+    expect_rows: 1
+    row: { reg_id: {$ref: rid}, reg_type: "NEW", packet_checksum: {$ref: packet.sha256.upper}, packet_size: {$ref: packet.size}, client_status_code: "APPROVED" }
+  regprc_transactions:
+    sql: "SELECT trn_type_code, status_code FROM mosip_regprc.registration_transaction WHERE reg_id = '${rid}' ORDER BY cr_dtimes"
+    expect:
+      ordered_subsequence:            # stage codes of the 1.2 default NEW workflow; $golden-verified
+        - PACKET_RECEIVER
+        - UPLOAD_PACKET
+        - VALIDATE_PACKET
+        - PACKET_CLASSIFICATION
+        - CMD_VALIDATION
+        - OPERATOR_VALIDATION
+        - DEMOGRAPHIC_VERIFICATION
+        - BIOGRAPHIC_VERIFICATION
+        - UIN_GENERATOR
+        - FINALIZATION
+      forbidden_status_codes: [FAILED, ERROR, REJECTED]
+      max_reprocess: 0
+    final:
+      sql: "SELECT status_code, reg_process_retry_count FROM mosip_regprc.registration WHERE reg_id = '${rid}'"
+      row: { status_code: "PROCESSED", reg_process_retry_count: 0 }
+  idrepo_and_kernel:
+    - sql: "SELECT status_code, uin_hash FROM mosip_idrepo.uin WHERE reg_id = '${rid}'"
+      expect_rows: 1
+      row: { status_code: "ACTIVATED", uin_hash: {$re: "^[0-9]+_[0-9A-F]{64}$", $cap: uin_hash} }
+    - sql: "SELECT uin_status FROM mosip_kernel.uin WHERE uin = '${uin}'"
+      row: { uin_status: "ASSIGNED" }
+    - sql: "SELECT vidtyp_code, status_code FROM mosip_idmap.vid WHERE uin_hash = '${uin_hash}'"
+      expect_rows: 1
+      row: { vidtyp_code: "PERPETUAL", status_code: "ACTIVE" }
+
+notification:
+  uin_email:
+    to: {$ref: resident.email}
+    subject: {$golden: true}
+    body_contains: ["${rid}"]         # UIN presence/masking in body is template-dependent: $golden
+    count: 1
+
+# ---------------------------------------------------------------------------
+# 2. TRACES — expected span tree (OTLP data model, stable semconv)
+#    kind: 1 INTERNAL, 2 SERVER, 3 CLIENT, 4 PRODUCER, 5 CONSUMER   status.code: 0 UNSET, 1 OK, 2 ERROR
+#    Resource attributes required on EVERY span: service.name, service.instance.id?, k8s.namespace.name, k8s.pod.name,
+#    telemetry.sdk.language=java, telemetry.sdk.name=opentelemetry
+# ---------------------------------------------------------------------------
+traces:
+  trace_set:
+    T1: { root: ROOT }                                  # Jarvis + regproc + idgenerator + idrepo (HTTP + Kafka propagation)
+    T2: { locate_by: "log attribute requestId from idrepo-identity -> trace_id", note: "credential request batch job starts a NEW trace (scheduled job, no parent)" }
+    T3: { locate_by: "span attr in ida-internal callback, or log correlation on credential id", note: "WebSub delivery starts a NEW trace" }
+  common_span_rules:
+    every_span:
+      traceId: {$re: "^[0-9a-f]{32}$"}
+      spanId: {$re: "^[0-9a-f]{16}$"}
+      endTimeUnixNano: ">= startTimeUnixNano"
+      resource:                                          # env/site model: observability/attribute-model.md
+        deployment.environment.name: {$ref: env.name}    # from the env configuration manager export
+        k8s.cluster.name: {$ref: env.cluster}
+        acme.site.name: {$ref: env.site}                 # single-site scenario: every MOSIP span on the target site
+        acme.site.role: {$ref: env.site_role}
+        acme.env.id: {$ref: env.id}
+        service.namespace: {$in: ["mosip", "jarvis"]}
+      attributes:
+        cicd.pipeline.run.id: {$ref: run.id}                     # via baggage + BaggageSpanProcessor (T1 only; T2/T3 have no baggage)
+        test.case.name: "NIN-001"
+    every_child_span: "parentSpanId refers to a span of the same trace; child start >= parent start (clock skew tolerance 50 ms)"
+  spans:
+    - alias: ROOT
+      trace: T1
+      resource: { service.name: "jarvis-e2e" }
+      scope: { name: "jarvis" }
+      name: "NIN-001 New adult registration no hit"
+      kind: 1
+      parentSpanId: ""                                   # root: empty
+      attributes:
+        cicd.pipeline.run.id: {$ref: run.id}
+        test.case.name: "NIN-001"
+        test.suite.name: "TC-NIN"
+        acme.test.persona: "adult-nohit"
+        acme.test.verdict: {$in: [PASS, PASS_OBSERVABILITY_DEFECT, INCONCLUSIVE, INFRA, SILENT_FAILURE, TEST_DATA_CONFIG, PRODUCT_BUG]}
+        test.case.result.status: {$in: [pass, fail]}     # semconv Test: pass iff acme.test.verdict == PASS
+        cicd.pipeline.name: {$ref: ci.pipeline.name}
+      status: { code: {$in: [1, 2]} }                    # OK if PASS, ERROR otherwise (set by Jarvis)
+      capture: { traceId: trace.root, spanId: span.root }
+
+    - alias: STEP_UPLOAD
+      trace: T1
+      resource: { service.name: "jarvis-e2e" }
+      name: {$re: "^step: Jarvis uploads .*registrationpackets.*$"}
+      kind: 1
+      parent: ROOT
+
+    - alias: JARVIS_UPLOAD_CLIENT
+      trace: T1
+      resource: { service.name: "jarvis-e2e" }
+      name: "POST"                                       # HTTP client span name = method (no url.template)
+      kind: 3
+      parent: STEP_UPLOAD
+      attributes:
+        http.request.method: "POST"
+        url.full: {$re: "^https://[^/]+/registrationprocessor/v1/packetreceiver/registrationpackets$"}
+        server.address: {$exists: true}
+        http.response.status_code: 200
+      status: { code: 0 }
+
+    - alias: PKR_SERVER
+      trace: T1
+      resource: { service.name: "regproc-pkr" }
+      name: {$re: "^POST (/registrationprocessor/v1/packetreceiver)?/registrationpackets$"}   # "{method} {http.route}", context path inclusion is version-dependent
+      kind: 2
+      parent: JARVIS_UPLOAD_CLIENT                       # or the Istio/Envoy proxy span if mesh tracing is on: parent_via_optional: [istio-ingressgateway]
+      attributes:
+        http.request.method: "POST"
+        url.path: "/registrationprocessor/v1/packetreceiver/registrationpackets"
+        url.scheme: {$in: [http, https]}
+        http.route: {$re: "^(/registrationprocessor/v1/packetreceiver)?/registrationpackets$"}
+        http.response.status_code: 200
+        network.protocol.version: {$in: ["1.1", "2"]}
+        mosip.rid: {$ref: rid}                           # requires agent extension INST-01
+      status: { code: 0 }                                # 2xx server span => UNSET (semconv)
+      duration_ms: {$lte: 5000}
+
+    - alias: PKR_DB_INSERT_REGISTRATION
+      trace: T1
+      resource: { service.name: "regproc-pkr" }
+      name: {$re: "^INSERT .*registration$"}
+      kind: 3
+      parent_ancestor: PKR_SERVER                        # may sit under Hibernate INTERNAL spans
+      attributes:
+        db.system.name: "postgresql"
+        db.namespace: "mosip_regprc"
+        db.operation.name: "INSERT"
+        db.collection.name: "registration"
+      count: {$gte: 1}
+
+    - alias: PKR_AUDIT_CLIENT
+      trace: T1
+      resource: { service.name: "regproc-pkr" }
+      name: "POST"
+      kind: 3
+      parent_ancestor: PKR_SERVER
+      attributes:
+        http.request.method: "POST"
+        url.full: {$re: "^https?://[^/]+/v1/auditmanager/audits$"}
+        http.response.status_code: 200
+    - alias: AUDIT_SERVER
+      trace: T1
+      resource: { service.name: "auditmanager" }
+      name: {$re: "^POST (/v1/auditmanager)?/audits$"}
+      kind: 2
+      parent: PKR_AUDIT_CLIENT
+      attributes: { http.response.status_code: 200 }
+    - alias: AUDIT_DB_INSERT
+      trace: T1
+      resource: { service.name: "auditmanager" }
+      name: {$re: "^INSERT .*app_audit_log$"}
+      kind: 3
+      parent_ancestor: AUDIT_SERVER
+      attributes: { db.system.name: "postgresql", db.namespace: "mosip_audit", db.operation.name: "INSERT", db.collection.name: "app_audit_log" }
+
+    - alias: PKR_KAFKA_PUBLISH
+      trace: T1
+      resource: { service.name: "regproc-pkr" }
+      name: {$re: "^.+ publish$"}                        # agent 2.x messaging naming "{destination} publish"
+      kind: 4
+      parent_ancestor: PKR_SERVER
+      attributes:
+        messaging.system: "kafka"
+        messaging.operation: "publish"
+        messaging.destination.name: {$cap: topic.pkr_out}
+
+    - alias: UPLOADER_PROCESS
+      trace: T1
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      name: {$re: "^.+ process$"}
+      kind: 5
+      parent: PKR_KAFKA_PUBLISH                          # receive-telemetry disabled (default) => process span is child of publish span
+      attributes:
+        messaging.system: "kafka"
+        messaging.operation: "process"
+        messaging.destination.name: {$ref: topic.pkr_out}
+        messaging.kafka.consumer.group: {$exists: true}
+        mosip.rid: {$ref: rid}
+    - alias: UPLOADER_DECRYPT
+      trace: T1
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      name: "POST"
+      kind: 3
+      parent_ancestor: UPLOADER_PROCESS
+      attributes: { url.full: {$re: "^https?://[^/]+/v1/keymanager/decrypt$"}, http.response.status_code: 200 }
+    - alias: UPLOADER_S3_PUT
+      trace: T1
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      name: "S3.PutObject"                               # AWS SDK instrumentation, object store adapter (MinIO)
+      kind: 3
+      parent_ancestor: UPLOADER_PROCESS
+      attributes: { rpc.system: "aws-api", rpc.service: "S3", rpc.method: "PutObject" }
+
+    - alias: STAGE_PROCESS
+      trace: T1
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      name: {$re: "^.+ process$"}
+      kind: 5
+      parent_kind: 4                                     # every stage hop = PRODUCER -> CONSUMER
+      attributes: { mosip.rid: {$ref: rid} }
+      count: {$gte: 8}                                   # >= number of stages in regprc_transactions.ordered_subsequence - 2
+      status: { code: 0 }
+
+    - alias: UINGEN_GET_UIN_CLIENT
+      trace: T1
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      name: "GET"
+      kind: 3
+      parent_kind_ancestor: 5
+      attributes: { url.full: {$re: "^https?://[^/]+/v1/idgenerator/uin$"}, http.response.status_code: 200 }
+    - alias: IDGEN_GET_SERVER
+      trace: T1
+      resource: { service.name: "idgenerator" }
+      name: {$re: "^GET (/v1/idgenerator)?/uin$"}
+      kind: 2
+      parent: UINGEN_GET_UIN_CLIENT
+    - alias: IDGEN_PUT_SERVER                            # UIN status ISSUED -> ASSIGNED after idrepo success
+      trace: T1
+      resource: { service.name: "idgenerator" }
+      name: {$re: "^PUT (/v1/idgenerator)?/uin$"}
+      kind: 2
+      after: IDREPO_CREATE_SERVER
+    - alias: IDREPO_CREATE_SERVER
+      trace: T1
+      resource: { service.name: "idrepo-identity" }
+      name: {$re: "^POST (/idrepository/v1/identity)?/?$"}
+      kind: 2
+      parent_kind: 3
+      after: IDGEN_GET_SERVER
+      attributes: { http.response.status_code: 200 }
+    - alias: IDREPO_ENCRYPT_CLIENT
+      trace: T1
+      resource: { service.name: "idrepo-identity" }
+      name: "POST"
+      kind: 3
+      parent_ancestor: IDREPO_CREATE_SERVER
+      attributes: { url.full: {$re: "^https?://[^/]+/v1/keymanager/encrypt$"} }
+      count: {$gte: 1}
+    - alias: IDREPO_DB_INSERT_UIN
+      trace: T1
+      resource: { service.name: "idrepo-identity" }
+      name: {$re: "^INSERT .*uin$"}
+      kind: 3
+      parent_ancestor: IDREPO_CREATE_SERVER
+      attributes: { db.system.name: "postgresql", db.namespace: "mosip_idrepo", db.collection.name: "uin" }
+
+    - alias: JARVIS_STATUS_POLL
+      trace: T1
+      resource: { service.name: "jarvis-e2e" }
+      name: "POST"
+      kind: 3
+      parent_ancestor: ROOT
+      attributes: { url.full: {$re: "^https://[^/]+/registrationprocessor/v1/registrationstatus/search$"}, http.response.status_code: 200 }
+      count: {$gte: 1, $lte: 60}
+
+  forbidden:
+    - "any span with status.code == 2 in T1, T2, T3"                              # allow-list below
+    - "any span event name == 'exception' in services regproc-*, idrepo-*, idgenerator, keymanager"
+  allow_list: []
+
+# ---------------------------------------------------------------------------
+# 3. LOGS — OTLP LogRecord expectations (logback appender of the Java agent)
+#    severityNumber: 9 INFO, 13 WARN, 17 ERROR (OTLP SeverityNumber)
+# ---------------------------------------------------------------------------
+logs:
+  query:
+    tenant: app
+    logql: '{deployment_environment_name="${env.name}", acme_site_name="${env.site}", service_name=~"regproc-.*|idrepo-.*|idgenerator|keymanager|auditmanager"} | trace_id=~"${trace.ids_regex}" or mosip_rid="${rid}"'
+  every_record_from_traced_thread:
+    traceId: {$re: "^[0-9a-f]{32}$"}                    # non-empty when emitted inside a span
+    spanId: {$re: "^[0-9a-f]{16}$"}
+    flags: 1                                             # sampled
+    resource: { service.name: {$exists: true}, k8s.pod.name: {$exists: true}, deployment.environment.name: {$ref: env.name}, acme.site.name: {$ref: env.site}, k8s.cluster.name: {$ref: env.cluster} }
+  expected:
+    - alias: LOG_PKR_RECEIVED
+      resource: { service.name: "regproc-pkr" }
+      severityNumber: 9
+      severityText: "INFO"
+      body: {$re: "(?s).*${rid}.*"}                     # MOSIP logger writes the RID in the message body
+      traceId: {$ref: trace.root}
+      spanId: {$span_of: [PKR_SERVER], $descendant_ok: true}    # log spanId = PKR_SERVER or one of its descendants
+      count: {$gte: 1}
+    - alias: LOG_STAGE_SUCCESS
+      resource: { service.name: {$re: "^regproc-group[1-7]$"} }
+      severityNumber: 9
+      body: {$re: "(?s).*${rid}.*"}
+      traceId: {$ref: trace.root}
+      count: {$gte: 8}
+    - alias: LOG_IDREPO_CREATED
+      resource: { service.name: "idrepo-identity" }
+      severityNumber: 9
+      traceId: {$ref: trace.root}
+      count: {$gte: 1}
+  forbidden:
+    - "severityNumber >= 17 with traceId in trace set or body containing ${rid}"
+    - "body or attribute containing ${uin} or ${vid} or ${resident.phone} or ${resident.email}"   # NFR-SEC-01, except notifier allow-list
+  pii_allow_list: [{ service.name: "notifier", fields: [resident.email] }]
+
+# ---------------------------------------------------------------------------
+# 4. METRICS — OTLP metrics (exported by agent) and spanmetrics (collector), checked in Mimir as deltas
+#    OTLP -> Mimir naming: http.server.request.duration (unit s) => http_server_request_duration_seconds_{bucket,count,sum}
+#    resource service.name => label job (no service.namespace set), service.instance.id => instance
+# ---------------------------------------------------------------------------
+metrics:
+  baseline:                           # Jarvis snapshots these at t0 (Background) and t_end (after settle)
+    - id: M1
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", acme_site_name="${env.site}", job="regproc-pkr", http_route=~".*registrationpackets", http_request_method="POST", http_response_status_code="200"})'
+    - id: M2
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", acme_site_name="${env.site}", job="idgenerator", http_route=~".*/uin", http_request_method="GET", http_response_status_code="200"})'
+    - id: M3
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", acme_site_name="${env.site}", job="idrepo-identity", http_request_method="POST", http_response_status_code="200"})'
+    - id: M4
+      promql: 'sum(traces_span_metrics_calls_total{deployment_environment_name="${env.name}", acme_site_name="${env.site}", service_name="auditmanager", span_kind="SPAN_KIND_SERVER", status_code!="STATUS_CODE_ERROR"})'
+    - id: M5
+      promql: 'sum(traces_span_metrics_calls_total{deployment_environment_name="${env.name}", acme_site_name="${env.site}", service_name=~"regproc-.*|idrepo-.*|idgenerator|keymanager", status_code="STATUS_CODE_ERROR"})'
+  assertions:
+    - { id: M1, delta: {$gte: 1} }    # exact == 1 only on a dedicated (non-shared) environment
+    - { id: M2, delta: {$gte: 1} }
+    - { id: M3, delta: {$gte: 1} }
+    - { id: M4, delta: {$gte: 10} }   # ~1 audit per stage + pkr + idrepo
+    - { id: M5, delta: 0 }
+    - id: ENV1                        # env/site promotion works: series of this run are labelled with the target env and site
+      promql: 'count(http_server_request_duration_seconds_count{job="regproc-pkr", deployment_environment_name="${env.name}", acme_site_name="${env.site}", k8s_cluster_name="${env.cluster}"})'
+      expect: {$gte: 1}
+    - id: ENV2                        # no leakage: this env's services never report another site's label
+      promql: 'count(target_info{deployment_environment_name="${env.name}", service_namespace="mosip", acme_site_name!="${env.site}"}) or vector(0)'
+      expect: 0                       # single-site scenario; DR scenarios override this
+    - id: X1                          # exemplar proves metric <-> trace link for this transaction
+      api: "GET /prometheus/api/v1/query_exemplars?query=http_server_request_duration_seconds_bucket{job=\"regproc-pkr\"}&start=${t0}&end=${t_end}"
+      expect: "at least one exemplar with labels.trace_id == ${trace.root}"
+  otlp_shape:                         # what the agent exports BEFORE Mimir (checked in golden run via collector debug exporter)
+    name: "http.server.request.duration"
+    unit: "s"
+    type: histogram
+    aggregationTemporality: 2         # CUMULATIVE
+    explicitBounds: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
+    dataPoint_attributes: [http.request.method, http.route, http.response.status_code, url.scheme, network.protocol.version]
+
+# ---------------------------------------------------------------------------
+# 5. AUDIT — MOSIP audit (kernel-auditmanager, table mosip_audit.app_audit_log) + Loki tenant "audit"
+#    Field names = AuditRequestDto / app_audit_log columns. Event ids/names are release-specific => $golden.
+# ---------------------------------------------------------------------------
+audit:
+  sql: >
+    SELECT event_id, event_name, event_type, app_id, app_name, module_id, module_name, ref_id, ref_id_type, host_name, action_dtimes
+    FROM mosip_audit.app_audit_log WHERE ref_id IN ('${rid}', '${uin_hash}') AND action_dtimes BETWEEN '${t0}' AND '${t_end}'
+    ORDER BY action_dtimes
+  every_row:
+    event_id: {$re: "^[A-Z]{3}_[0-9]{3}$"}
+    event_type: {$in: [BUSINESS, SYSTEM]}
+    ref_id_type: {$in: [REGISTRATION_ID, UIN_HASH, RID]}
+    host_name: {$exists: true}
+  expected_modules_ordered_subsequence:       # one or more rows per stage; module ids frozen from golden run
+    - { module_name: {$golden: true}, step: B3, ref_id: {$ref: rid} }   # packet receiver
+    - { module_name: {$golden: true}, step: C1, ref_id: {$ref: rid} }   # packet uploader
+    - { module_name: {$golden: true}, step: C4, ref_id: {$ref: rid} }   # packet validator
+    - { module_name: {$golden: true}, step: C5, ref_id: {$ref: rid} }   # CMD / operator validation
+    - { module_name: {$golden: true}, step: C6, ref_id: {$ref: rid} }   # demo / bio dedupe
+    - { module_name: {$golden: true}, step: D1, ref_id: {$ref: rid} }   # uin generator
+    - { module_name: {$golden: true}, step: D2, ref_id: {$ref: uin_hash} } # idrepo create
+  no_failure_events: "event_name not matching (?i).*(FAIL|EXCEPTION|ERROR).*"
+  loki_audit_tenant:
+    logql: '{stream="mosip-audit"} | json | ref_id=~"${rid}|${uin_hash}"'
+    expect: "same multiset of (event_id, module_id, ref_id) as the SQL result"   # proves the audit pipeline is complete
+  trace_link:
+    expect: "every audit row has a matching AUDIT_SERVER span (same host, |time delta| < 2 s)"   # MOSIP audit has no trace_id column
+
+# ---------------------------------------------------------------------------
+# 6. NON-FUNCTIONAL
+# ---------------------------------------------------------------------------
+nfr:
+  e2e_upload_to_processed_s: {$lte: 600}
+  span_budgets_ms:
+    PKR_SERVER: {$lte: 5000}
+    UPLOADER_PROCESS: {$lte: 30000}
+    IDREPO_CREATE_SERVER: {$lte: 3000}
+    IDGEN_GET_SERVER: {$lte: 500}
+  infra_window_checks:
+    - { promql: 'sum(increase(kube_pod_container_status_restarts_total{namespace=~"regproc|idrepo|kernel|keymanager|ida"}[${window}]))', expect: 0 }
+    - { promql: 'max_over_time(kafka_consumergroup_lag{consumergroup=~"regproc.*"}[${window}])', expect: "back to 0 at t_end" }
+  security:
+    NFR-SEC-01: "logs.forbidden[1] and no span attribute value equal to ${uin}, ${vid}"
+
+# ---------------------------------------------------------------------------
+# 7. VERDICT MAPPING (page 5 decision tree)
+# ---------------------------------------------------------------------------
+verdict:
+  functional_checks: [rules, api, db, notification, "feature Then-steps"]
+  signal_contract: [traces.spans, logs.expected, metrics.assertions, audit]
+  classes:
+    PASS: "functional OK and signal_contract 100 %"
+    PASS_OBSERVABILITY_DEFECT: "functional OK and signal_contract < 100 %"
+    INCONCLUSIVE: "settle.max_wait_s exceeded or OBS-02 violated during window"
+    INFRA: "functional KO and infra_window_checks violated"
+    SILENT_FAILURE: "functional KO and no ERROR span/log for the failing step"
+    TEST_DATA_CONFIG: "functional KO with business rejection code mapped to masterdata/partner config"
+    PRODUCT_BUG: "functional KO with ERROR span + exception event in a MOSIP service, infra clean"

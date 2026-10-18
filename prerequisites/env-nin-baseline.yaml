@@ -1,0 +1,126 @@
+# Environment prerequisites for all TC-NIN scenarios.
+# Jarvis runs every "check" below BEFORE the scenario (Background). Any failure => verdict ENV_NOT_READY,
+# the scenario is not executed (no false product KO).
+apiVersion: jarvis.test/v1
+kind: EnvironmentPrerequisites
+metadata:
+  id: env-nin-baseline
+  version: 1.0.0
+
+environment:                            # resolved at runtime from the env configuration manager (COTS) - never hard-coded
+  source:
+    system: "env-config-manager"        # the COTS tool (CMDB / test environment manager)
+    api: "GET <env-manager>/api/environments/{env_id}"      # adapt to the COTS API
+    select_by: "--env CLI arg of Jarvis (e.g. test-int@DC1)"
+  bind:                                 # variables used by features / oracles
+    env.id:        "$.id"               # -> acme.env.id
+    env.name:      "$.name"             # -> deployment.environment.name
+    env.site:      "$.site.code"        # -> acme.site.name  (DC1, DC2)
+    env.site_role: "$.site.role"        # -> acme.site.role  (primary, dr)
+    env.cluster:   "$.k8s.cluster"      # -> k8s.cluster.name
+    env.snapshot:  "$.version"          # -> acme.env.config.version (stored in the evidence manifest)
+    env.api_base:  "$.endpoints.mosip_internal_api"
+  jarvis_resource:                      # Jarvis' own OTEL_RESOURCE_ATTRIBUTES (it runs "for" the target env)
+    service.name: jarvis-e2e
+    service.namespace: jarvis
+    deployment.environment.name: "${env.name}"
+    acme.site.name: "${env.site}"
+    k8s.cluster.name: "${env.cluster}"
+    acme.env.id: "${env.id}"
+  checks:
+    - { id: ENV-01, desc: "env record status is 'available/reserved for this run' in the env manager" }
+    - { id: ENV-02, desc: "collector agent resource/site-stamp of ${env.cluster} has env.name / env.site equal to the env manager record (config drift check)" }
+    - { id: ENV-03, promql: 'count(target_info{deployment_environment_name="${env.name}", acme_site_name="${env.site}", service_namespace="mosip"})', expect: ">= number of components" }
+
+platform:
+  mosip_release: "1.2.0.x"            # pin exact patch; oracle values are only valid for this release
+  components:                           # image tags are captured into the evidence manifest
+    - { deployment: regproc-pkr,      service_name: regproc-pkr }
+    - { deployment: regproc-status,   service_name: regproc-status }
+    - { deployment: regproc-group1,   service_name: regproc-group1 }  # packet-uploader ... (stage grouping per helm values)
+    - { deployment: regproc-group2,   service_name: regproc-group2 }
+    - { deployment: regproc-group3,   service_name: regproc-group3 }
+    - { deployment: regproc-group4,   service_name: regproc-group4 }
+    - { deployment: regproc-group5,   service_name: regproc-group5 }
+    - { deployment: regproc-group6,   service_name: regproc-group6 }
+    - { deployment: regproc-group7,   service_name: regproc-group7 }
+    - { deployment: packetmanager,    service_name: packetmanager }
+    - { deployment: keymanager,       service_name: keymanager }
+    - { deployment: authmanager,      service_name: authmanager }
+    - { deployment: masterdata,       service_name: masterdata }
+    - { deployment: syncdata,         service_name: syncdata }
+    - { deployment: idgenerator,      service_name: idgenerator }
+    - { deployment: auditmanager,     service_name: auditmanager }
+    - { deployment: notifier,         service_name: notifier }
+    - { deployment: idrepo-identity,  service_name: idrepo-identity }
+    - { deployment: idrepo-vid,       service_name: idrepo-vid }
+    - { deployment: credentialrequest, service_name: credentialrequest }
+    - { deployment: credential,       service_name: credential }
+    - { deployment: datashare,        service_name: datashare }
+    - { deployment: ida-auth,         service_name: ida-auth }
+    - { deployment: ida-internal,     service_name: ida-internal }
+    - { deployment: abis-mock,        service_name: abis-mock }
+
+observability:                          # the oracle depends on these exact settings
+  otel_java_agent: "2.x.y"              # pin; span names / attributes are version-dependent
+  env:
+    OTEL_SERVICE_NAME: "<deployment name>"           # = service_name column above (deterministic)
+    OTEL_PROPAGATORS: "tracecontext,baggage"
+    OTEL_SEMCONV_STABILITY_OPT_IN: "database"        # stable DB semconv: db.system.name, db.namespace, db.operation.name, db.collection.name, db.query.text
+    OTEL_LOGS_EXPORTER: "otlp"
+    OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_CAPTURE_MDC_ATTRIBUTES: "*"
+    OTEL_INSTRUMENTATION_LOGBACK_APPENDER_EXPERIMENTAL_LOG_ATTRIBUTES: "true"
+    OTEL_METRICS_EXEMPLAR_FILTER: "trace_based"
+  agent_extensions:
+    - name: baggage-span-processor     # opentelemetry-java-contrib baggage-processor: copies cicd.pipeline.run.id / test.case.name to every span
+      predicate: "key in [cicd.pipeline.name, cicd.pipeline.run.id, test.suite.name, test.case.name]"   # semconv CICD + Test keys
+    - name: mosip-rid-enricher          # INST-01 (to build): sets span attr + MDC 'mosip.rid' wherever the RID is known
+  collector:
+    tail_sampling_policy: "keep 100% when span attribute cicd.pipeline.run.id exists"
+    decision_wait: 30s
+  backends:
+    tempo_version: "2.x"                # NB: Tempo JSON returns traceId/spanId base64-encoded -> oracle engine normalises to lowercase hex
+    loki_tenants: [app, audit]
+    mimir: true
+  checks:
+    - id: OBS-01  # canary: span emitted by Jarvis is retrievable in Tempo within 60 s
+    - id: OBS-02  # otelcol_exporter_send_failed_spans / _log_records / _metric_points rate == 0 for 5 min
+    - id: OBS-03  # one log line with trace_id from each component above found in Loki in last 24 h
+
+masterdata:                             # values are those of the test seed (mosip-data fork), verified via API
+  checks:
+    - { id: MD-01, api: "GET /v1/masterdata/registrationcenters/{centerId}/{lang}", expect: "isActive=true, zone mapped" }
+    - { id: MD-02, api: "GET /v1/masterdata/machines/{machineId}/{lang}",          expect: "isActive=true, regCenterId={centerId}" }
+    - { id: MD-03, api: "GET /v1/masterdata/users/{operatorId}",                    expect: "active, mapped to centerId" }
+    - { id: MD-04, api: "GET /v1/syncdata/latestidschema?schemaVersion=0",           expect: "idVersion == data.idSchemaVersion" }
+    - { id: MD-05, api: "GET /v1/masterdata/templates/{lang}/{uinGeneratedTemplateType}", expect: "exists for eng" }
+    - { id: MD-06, api: "GET /v1/masterdata/applicanttype/getApplicantType (adult, non-foreigner)", expect: "doc categories POA, POI required" }
+  values:
+    centerId: "10001"
+    machineId: "10001"
+    operatorId: "110001"
+    langs: [eng]
+
+partners_and_keys:
+  checks:
+    - { id: KM-01, api: "GET /v1/keymanager/getCertificate?applicationId=REGISTRATION&referenceId={centerId}_{machineId}", expect: "certificate valid > test duration" }
+    - { id: KM-02, api: "GET /v1/keymanager/getCertificate?applicationId=ID_REPO", expect: "valid" }
+    - { id: PM-01, desc: "IDA partner + credential policy for auth credential active" }
+    - { id: PM-02, desc: "ABIS partner + datashare policy active; abis-mock configured" }
+
+capacity:
+  checks:
+    - { id: CAP-01, sql: "SELECT count(*) FROM mosip_kernel.uin WHERE uin_status='UNUSED'", expect: ">= 1000" }
+    - { id: CAP-02, promql: "max(kafka_consumergroup_lag{consumergroup=~\"regproc.*\"})", expect: "== 0" }
+    - { id: CAP-03, promql: "sum(kube_pod_container_status_ready{namespace=~\"regproc|idrepo|kernel|ida\"} == 0)", expect: "== 0" }
+
+mocks:
+  abis_mock:      { mode: "NO_HIT", api: "configure via abis-mock admin endpoint" }
+  mds_mock:       { biometrics: "synthetic ISO 19794 images, quality >= 80" }
+  smtp_mock:      { type: "MailHog / mock-smtp", api: "GET /api/v2/messages" }
+
+credentials:        # never stored here: resolved from the vault at runtime
+  jarvis_client: "vault:secret/mosip/test/jarvis-client"   # clientId + secretKey for authmanager (appId 'regproc')
+  ida_partner:    "vault:secret/mosip/test/ida-partner"
+  db_readonly:    "vault:secret/mosip/test/db-ro"
+  observability_sa: "vault:secret/obs/test/grafana-sa"

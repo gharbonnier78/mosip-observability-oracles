@@ -1,0 +1,55 @@
+@startuml nin-usecase
+' NIMS 2.0 (Nigeria) on MOSIP 1.2 - NIN enrolment and issuance - use case view
+' Requirement tags refer to models/nin-requirements.md
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Resident applicant" as RES
+actor "Enrolment officer" as OFF
+actor "Supervisor" as SUP
+actor "Introducer\n(parent / guardian)" as INT
+actor "Adjudicator" as ADJ
+actor "ABIS\n(biometric engine)" as ABIS <<system>>
+actor "Messaging gateway\n(SMS / email)" as MSG <<system>>
+actor "Relying party\n(bank, telco, agency)" as RP <<system>>
+actor "Auditor / regulator" as AUD
+
+rectangle "NIMS 2.0 identity platform (MOSIP)" {
+  usecase "Enrol resident\n[F-01]" as UC1
+  usecase "Capture biometrics\n[F-02, NF-02]" as UC2
+  usecase "Issue acknowledgement\n(RID slip) [F-03, NF-01]" as UC3
+  usecase "Upload registration packet\n(offline-tolerant) [NF-03]" as UC4
+  usecase "Validate packet and rules\n[F-04]" as UC5
+  usecase "Deduplicate identity\n[F-05]" as UC6
+  usecase "Adjudicate possible duplicate\n[F-06]" as UC7
+  usecase "Issue NIN and VID\n[F-07, NF-04]" as UC8
+  usecase "Activate identity and\nissue credential [F-08]" as UC9
+  usecase "Notify resident\n[F-09, NF-05]" as UC10
+  usecase "Verify NIN\n(authentication) [F-11]" as UC11
+  usecase "Introduce child applicant\n[F-12]" as UC12
+  usecase "Consult audit trail\n[F-10, NF-07]" as UC13
+}
+
+RES --> UC1
+OFF --> UC1
+OFF --> UC2
+OFF --> UC3
+OFF --> UC4
+SUP --> UC3 : approves
+INT --> UC12
+UC1 <.. UC12 : <<extend>>\nchild < 5 y
+UC1 ..> UC2 : <<include>>
+UC1 ..> UC3 : <<include>>
+UC4 ..> UC5 : <<include>>
+UC5 ..> UC6 : <<include>>
+UC6 <.. UC7 : <<extend>>\npossible match
+UC6 -- ABIS
+UC7 -- ADJ
+UC8 ..> UC9 : <<include>>
+UC9 ..> UC10 : <<include>>
+UC10 -- MSG
+UC10 --> RES : NIN by SMS / email
+RP --> UC11
+AUD --> UC13
+@enduml

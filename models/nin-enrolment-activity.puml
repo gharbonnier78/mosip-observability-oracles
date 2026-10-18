@@ -1,0 +1,60 @@
+@startuml nin-enrolment-activity
+' NIMS 2.0 - NIN enrolment to issuance - main human and technical stakeholders only
+' Rules are tagged; see models/nin-requirements.md. [A] = assumption to confirm.
+|Resident|
+start
+:Arrive at enrolment centre with documents;
+|Enrolment station (officer)|
+:Capture demographics and documents
+validated against ID schema and reference data [F-01];
+:Capture fingerprints, irises, face
+quality check, max 3 retries per modality [F-02][NF-02];
+if (Quality reached?) then (no after retries)
+  :Record biometric exception with photo [F-02];
+endif
+:Supervisor approval; print RID slip
+session <= [15] min [A] [F-03][NF-01];
+|Resident|
+:Keep RID slip (proof of enrolment);
+|Enrolment station (officer)|
+while (Network to central platform?) is (down)
+  :Queue encrypted packet locally
+  (offline >= [72] h, no loss) [NF-03];
+endwhile (up)
+:Sync and upload packet [NF-03];
+|Central platform (MOSIP)|
+:Validate integrity, centre / machine / operator,
+ID schema conformance [F-04];
+if (Packet valid?) then (no)
+  :Reject with reason; notify resident [F-04][F-09];
+  stop
+endif
+|ABIS|
+:Demographic and biometric deduplication [F-05];
+if (Possible match?) then (yes)
+  |Adjudicator|
+  :Manual adjudication [F-06];
+  if (Duplicate confirmed?) then (yes)
+    |Central platform (MOSIP)|
+    :Reject; no NIN consumed [F-06];
+    stop
+  endif
+endif
+|Central platform (MOSIP)|
+:Assign exactly one NIN (11 digits, check digit) [A]
+and one perpetual VID [F-07];
+:Activate identity; issue credential
+to verification partners [F-08];
+note right
+  RID -> NIN <= [24] h end-to-end
+  for no-hit cases [A] [NF-04]
+  Audit event per step [F-10]
+  Signals per step, env/site tagged [NF-07][NF-08]
+end note
+|Messaging gateway|
+:Send NIN by SMS and email in chosen language
+within [15] min of issuance [A] [F-09][NF-05];
+|Resident|
+:Receive NIN;
+stop
+@enduml

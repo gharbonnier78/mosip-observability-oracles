@@ -1,0 +1,56 @@
+# Data requirements for NIN-001. This is a CONTRACT for the fake-data generator (next step),
+# not the data itself. The generator must produce data satisfying every constraint, compliant
+# with the ID schema returned by GET /v1/syncdata/latestidschema (captured in prerequisite MD-04).
+apiVersion: jarvis.test/v1
+kind: Persona
+metadata:
+  id: adult-nohit
+  used_by: [NIN-001, NIN-050, NIN-051, NIN-052]
+
+determinism:
+  seed: "${cicd.pipeline.run.id}:${scenario.id}"          # same seed => same resident => reproducible run
+  uniqueness: "name+dob+biometrics must not exist in idrepo nor ABIS gallery (fresh per run)"
+
+registration:
+  regType: NEW                                     # packet type
+  process: NEW
+  centerId: "${env.masterdata.values.centerId}"
+  machineId: "${env.masterdata.values.machineId}"
+  operatorId: "${env.masterdata.values.operatorId}"
+  rid:
+    format: "^[0-9]{29}$"                          # centerId(5) + machineId(5) + sequence(5) + yyyyMMddHHmmss(14)
+    composition: "{centerId}{machineId}{seq5}{timestampUTC}"
+
+identity:                                          # field names = default MOSIP 1.2 ID schema; adapt to your schema
+  IDSchemaVersion:  { type: number, from: "MD-04.idVersion" }
+  fullName:         { type: "simpleType[]", langs: [eng], constraint: "2-50 chars, letters/space, not in blocklisted words" }
+  dateOfBirth:      { type: string, format: "yyyy/MM/dd", constraint: "age between 18 and 80 at registration date" }
+  gender:           { type: "simpleType[]", values: "from dynamic field 'gender' (e.g. MLE, FLE)" }
+  residenceStatus:  { type: "simpleType[]", values: "from dynamic field 'residenceStatus' (e.g. NFR)" }
+  addressLine1:     { type: "simpleType[]", constraint: "1-50 chars" }
+  region:           { type: "simpleType[]", values: "location code at hierarchy level 1, valid & active" }
+  province:         { type: "simpleType[]", values: "child of region" }
+  city:             { type: "simpleType[]", values: "child of province" }
+  zone:             { type: "simpleType[]", values: "child of city, = center zone or allowed" }
+  postalCode:       { type: string, values: "child of zone", format: "^[0-9]{5}$" }
+  phone:            { type: string, format: "^[1-9][0-9]{9}$" }
+  email:            { type: string, format: "email", constraint: "domain routed to smtp_mock" }
+  proofOfAddress:   { type: documentType, category: POA, docType: "from MD-06", file: "PDF/JPG < 1 MB" }
+  proofOfIdentity:  { type: documentType, category: POI, docType: "from MD-06" }
+  individualBiometrics:
+    type: biometricsType
+    format: cbeff
+    modalities:
+      finger: { count: 10, standard: "ISO/IEC 19794-4:2011", quality_min: 80 }
+      iris:   { count: 2,  standard: "ISO/IEC 19794-6:2011", quality_min: 80 }
+      face:   { count: 1,  standard: "ISO/IEC 19794-5:2011", quality_min: 80 }
+    exceptions: none
+
+derived_expectations:                              # what the oracle will compare against
+  demographic_equality: [fullName, dateOfBirth, gender, residenceStatus, addressLine1, region, province, city, zone, postalCode, phone, email]
+  documents_expected: [proofOfAddress, proofOfIdentity]
+  biometrics_expected: { finger: 10, iris: 2, face: 1 }
+
+pii_handling:
+  test_data_is_synthetic: true
+  forbidden_in_logs_and_spans: [UIN, VID, phone, email, biometric payloads]   # checked by oracle NFR-SEC-01
