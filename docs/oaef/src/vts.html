@@ -1,0 +1,240 @@
+<html><head><meta charset="utf-8"><title>Observability and Audit Evidence Framework Validation Test Specification</title>
+<style>
+body { font-family: Arial, sans-serif; font-size: 10pt; }
+h1 { font-family: Arial; color: #003088; font-size: 18pt; }
+h2 { font-family: Arial; color: #003088; font-size: 14pt; }
+h3 { font-family: Arial; color: #003088; font-size: 12pt; }
+h4 { font-family: Arial; color: #3A3A3A; font-size: 10.5pt; }
+table { border-collapse: collapse; width: 100%; }
+th { background: #003088; color: #FFFFFF; font-size: 9pt; text-align: left; border: 1px solid #8C8C8C; padding: 3pt; }
+td { font-size: 9pt; border: 1px solid #8C8C8C; padding: 3pt; vertical-align: top; }
+pre { font-family: Consolas, 'Courier New', monospace; font-size: 8pt; background: #F2F2F2; border: 1px solid #D0D0D0; padding: 4pt; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
+.note { background: #F6F0E4; border: 1px solid #C6AA76; padding: 4pt; }
+</style></head><body>
+
+<p class="cover-title">Observability and Audit Evidence Framework — Validation Test Specification</p>
+<p class="cover-sub">OAEF — Test plan, test design, test cases, procedures and completion report for the validation of the framework once implemented and deployed, in simulation mode and in full mode on scenario NIN-001</p>
+<table>
+<tr><th style="width:30%">Field</th><th>Value</th></tr>
+<tr><td>Document identifier</td><td>OAEF-VTS-001</td></tr>
+<tr><td>Version</td><td>0.1 — Draft for review</td></tr>
+<tr><td>Date</td><td>2026-10-18</td></tr>
+<tr><td>Test basis</td><td>OAEF-SPEC-001 — Observability and Audit Evidence Framework Specification</td></tr>
+<tr><td>Owner</td><td>[Name, role]</td></tr>
+<tr><td>Classification</td><td>[To be set by the document owner]</td></tr>
+</table>
+<h4>Document control</h4>
+<table>
+<tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
+<tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft.</td></tr>
+</table>
+<h4>Approvals</h4>
+<table>
+<tr><th style="width:30%">Role</th><th style="width:30%">Name</th><th style="width:20%">Date</th><th>Signature</th></tr>
+<tr><td>Test and qualification lead</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+<tr><td>WP0 lead</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+<tr><td>Security officer</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+</table>
+<!--TOC-->
+
+<h1>1 Introduction</h1>
+<h2>1.1 Purpose</h2>
+<p>This document specifies how to validate that the Observability and Audit Evidence Framework (OAEF), once implemented and deployed, meets the requirements of OAEF-SPEC-001. Its structure follows ISO/IEC/IEEE 29119-3: test plan (chapter 2), test design (chapter 3), test environment and data (chapter 4), test procedures (chapter 5), test cases (chapter 6), traceability (chapter 7) and completion report template (chapter 8).</p>
+<h2>1.2 Validation modes</h2>
+<table>
+<tr><th style="width:18%">Mode</th><th style="width:42%">Principle</th><th>When</th></tr>
+<tr><td><b>S — Simulation</b></td><td>Synthetic telemetry generated with OpenTelemetry telemetrygen, and replay of the NIN-001 OTLP example with fresh identifiers and timestamps. Validates the generic layer and the qualification layer without MOSIP.</td><td>As soon as the generic layer is deployed (WP0.1), before instrumentation of MOSIP is complete.</td></tr>
+<tr><td><b>F — Full</b></td><td>Execution of NIN-001 (and selected variants) on the MOSIP test platform with Jarvis, real signals, evidence and verdict.</td><td>After WP0.2 and WP0.3; mandatory for acceptance.</td></tr>
+<tr><td><b>I / D</b></td><td>Inspection of configuration and documents; demonstration of a workflow.</td><td>Any time.</td></tr>
+</table>
+<h2>1.3 References</h2>
+<table>
+<tr><th style="width:12%">Ref</th><th>Document</th></tr>
+<tr><td>[R1]</td><td>OAEF-SPEC-001 — Observability and Audit Evidence Framework Specification.</td></tr>
+<tr><td>[R2]</td><td>ISO/IEC/IEEE 29119-3:2021 — Test documentation.</td></tr>
+<tr><td>[R3]</td><td>Repository mosip-observability-oracles (oracles, examples, feature, persona, prerequisites).</td></tr>
+<tr><td>[R4]</td><td>OpenTelemetry Collector contrib — telemetrygen tool documentation (version pinned with the collector).</td></tr>
+</table>
+
+<h1>2 Test plan</h1>
+<h2>2.1 Test items</h2>
+<ul>
+<li>Generic layer: instrumentation conditions, collector agent and gateway, Tempo, Loki (app and audit tenants), Mimir, Grafana, object storage.</li>
+<li>Deployment: Terraform modules, Helm values, Argo CD applications, overlays generated from the environment manager.</li>
+<li>Qualification layer: Jarvis, data generator, mocks, evidence collector, oracle engine, reporter.</li>
+<li>Reference implementation: NIN-001 oracle, feature, persona and prerequisites.</li>
+</ul>
+<h2>2.2 Features to be tested</h2>
+<p>All requirements of OAEF-SPEC-001 chapter 5 (SW, TST, INF, SEC, DQ, OPS). Features not tested in this version: production monitoring service levels; performance of MOSIP itself.</p>
+<h2>2.3 Approach</h2>
+<ol>
+<li><b>Phase V1 — Simulation</b>: VT-INF, VT-PIPE, VT-SEC (mode S), VT-QUAL. Demonstrates the pipeline, storage, security controls and verdict logic with controlled inputs, including injected faults.</li>
+<li><b>Phase V2 — Full NIN-001</b>: VT-SW, VT-E2E. Demonstrates the real instrumentation of MOSIP and the full evidence chain.</li>
+<li><b>Phase V3 — Inspection and demonstration</b>: remaining I and D test cases, sign-off.</li>
+</ol>
+<p>Each test case produces its own evidence (chapter 6) stored in the evidence bucket under <code>validation/&lt;campaign-id&gt;/&lt;test-case-id&gt;/</code>.</p>
+<h2>2.4 Entry criteria</h2>
+<ul>
+<li>V1: observability stack and qualification tooling deployed on the target platform by GitOps; telemetrygen available at the pinned version; credentials for read-only service accounts.</li>
+<li>V2: MOSIP test platform deployed; prerequisites env-nin-baseline green; MOSIP extension and audit patch deployed.</li>
+</ul>
+<h2>2.5 Exit criteria</h2>
+<ul>
+<li>All test cases covering <b>M</b> requirements passed; no open defect of severity critical or major.</li>
+<li>VT-E2E-01 passed twice consecutively on TEST with identical verdicts.</li>
+<li>Every requirement of OAEF-SPEC-001 covered by at least one passed test case (chapter 7).</li>
+</ul>
+<h2>2.6 Suspension and resumption</h2>
+<p>Suspend when the pipeline-health objectives are breached (results would be INCONCLUSIVE) or when the platform drifts from the environment manager. Resume after correction and a passing VT-INF-01 canary.</p>
+<h2>2.7 Roles</h2>
+<table>
+<tr><th style="width:30%">Role</th><th>Responsibility</th></tr>
+<tr><td>Test lead</td><td>Plans, runs campaigns, signs the completion report.</td></tr>
+<tr><td>Platform engineer</td><td>Deploys, injects infrastructure faults, restores.</td></tr>
+<tr><td>Observability owner</td><td>Reviews signal and oracle results.</td></tr>
+<tr><td>Security officer</td><td>Witnesses VT-SEC tests and approves.</td></tr>
+<tr><td>Functional owner</td><td>Reviews NIN-001 functional results and golden runs.</td></tr>
+</table>
+<h2>2.8 Risks</h2>
+<table>
+<tr><th style="width:40%">Risk</th><th>Mitigation</th></tr>
+<tr><td>Configuration keys differ in the pinned versions</td><td>Validate configuration baselines in DEV first; record versions in each test record.</td></tr>
+<tr><td>MOSIP extension not ready for V2</td><td>Run V1 fully; mark dependent VT-SW cases blocked, not failed.</td></tr>
+<tr><td>Shared platform noise</td><td>Use ephemeral namespaces (VT-INF-09) or relative assertions.</td></tr>
+</table>
+
+<h1>3 Test design</h1>
+<table>
+<tr><th style="width:16%">Feature set</th><th style="width:40%">Covers</th><th>Test cases</th></tr>
+<tr><td>FS-1 Infrastructure</td><td>Stack per site, WORM, tenancy, capacity, time, network, drift, GitOps, DR</td><td>VT-INF-01 to VT-INF-10</td></tr>
+<tr><td>FS-2 Pipeline</td><td>Ingestion, sampling, redaction, routing, derived metrics, health</td><td>VT-PIPE-01 to VT-PIPE-06</td></tr>
+<tr><td>FS-3 Instrumentation</td><td>Agent, keys, propagation, links, audit correlation, metrics, edges</td><td>VT-SW-01 to VT-SW-09</td></tr>
+<tr><td>FS-4 Security</td><td>PII, lookup, access, transport, baggage, integrity, compliance, supply chain, publication</td><td>VT-SEC-01 to VT-SEC-09</td></tr>
+<tr><td>FS-5 Data quality</td><td>Registry, contract, cardinality</td><td>VT-DQ-01 to VT-DQ-03</td></tr>
+<tr><td>FS-6 Qualification layer</td><td>Root span, evidence, oracle, release awareness, data, mocks, reports, verdicts</td><td>VT-QUAL-01 to VT-QUAL-08</td></tr>
+<tr><td>FS-7 End to end</td><td>NIN-001, audit gap, DR site</td><td>VT-E2E-01 to VT-E2E-03</td></tr>
+<tr><td>FS-8 Operations</td><td>Dashboards, alerts, governance</td><td>VT-OPS-01, VT-OPS-02</td></tr>
+</table>
+
+<h1>4 Test environment and data</h1>
+<h2>4.1 Environment</h2>
+<table>
+<tr><th style="width:30%">Element</th><th>Requirement</th></tr>
+<tr><td>Platform</td><td>TEST (and DC2 for VT-E2E-03, VT-INF-10)</td></tr>
+<tr><td>Tools</td><td>telemetrygen (pinned), curl, Python 3, a TraceQL/LogQL/PromQL client or Grafana, S3 client, Jarvis</td></tr>
+<tr><td>Accounts</td><td>Read-only service accounts per tenant; auditor test user; non-privileged test user</td></tr>
+<tr><td>Variables</td><td><code>AGENT</code> collector agent host, <code>TEMPO</code>, <code>LOKI</code>, <code>MIMIR</code>, <code>GRAFANA</code> base URLs</td></tr>
+</table>
+<h2>4.2 Test data</h2>
+<ul>
+<li><b>D1 — NIN-001 OTLP example</b>: <code>oracles/examples/NIN-001.otlp-example.json</code> (7 spans, 1 log record, 1 histogram data point with exemplar).</li>
+<li><b>D2 — Synthetic load</b>: telemetrygen profiles per platform (rates [X], [Y], [Z]).</li>
+<li><b>D3 — Fault data sets</b>: variants of D1 for verdict classification: missing span; error span with exception event; Kubernetes restart event in the window; business rejection code; wrong outcome without error signal; pipeline breach.</li>
+<li><b>D4 — PII seeds</b>: fake 11-digit NIN, fake email and phone, never real values.</li>
+<li><b>D5 — Persona adult-nohit</b> for full mode.</li>
+</ul>
+
+<h1>5 Test procedures</h1>
+<h2>5.1 TP-1 Replay of the NIN-001 OTLP example (simulation)</h2>
+<p>The example must be replayed with new trace and span identifiers and current timestamps, so that each replay is unique and inside the retention window. Python handles the 64-bit nanosecond integers exactly.</p>
+<pre>#!/usr/bin/env python3
+# replay_nin001.py  —  usage: python3 replay_nin001.py NIN-001.otlp-example.json http://AGENT:4318
+import json, os, sys, time, urllib.request
+src, endpoint = sys.argv[1], sys.argv[2].rstrip('/')
+doc = json.load(open(src, encoding='utf-8'))
+ids = {}
+def new_id(old, n):
+    if not old: return old
+    return ids.setdefault(old, os.urandom(n).hex())
+t_min = min(int(s['startTimeUnixNano']) for rs in doc['traces']['resourceSpans']
+            for ss in rs['scopeSpans'] for s in ss['spans'])
+shift = time.time_ns() - t_min - 60_000_000_000          # start one minute ago
+def fix(o):
+    if isinstance(o, dict):
+        for k, v in list(o.items()):
+            if k.endswith('UnixNano') and isinstance(v, str): o[k] = str(int(v) + shift)
+            elif k == 'traceId': o[k] = new_id(v, 16)
+            elif k in ('spanId', 'parentSpanId'): o[k] = new_id(v, 8)
+            else: fix(v)
+    elif isinstance(o, list):
+        for x in o: fix(x)
+for block in ('traces', 'logs', 'metrics'): fix(doc[block])
+for block, path in (('traces', '/v1/traces'), ('logs', '/v1/logs'), ('metrics', '/v1/metrics')):
+    req = urllib.request.Request(endpoint + path, data=json.dumps(doc[block]).encode(),
+                                 headers={'Content-Type': 'application/json'})
+    print(block, urllib.request.urlopen(req).status)
+root = ids['4bf92f3577b34da6a3ce929d0e0e4736']
+print('replayed trace id:', root)</pre>
+<p>Verification queries (replace <code>&lt;trace_id&gt;</code> with the printed id):</p>
+<pre>curl -s "$TEMPO/api/v2/traces/&lt;trace_id&gt;"                       # 7 spans, ids returned base64: normalise to hex
+curl -s -G "$LOKI/loki/api/v1/query_range" -H "X-Scope-OrgID: app" \
+     --data-urlencode 'query={service_name="regproc-pkr"} | trace_id="&lt;trace_id&gt;"'
+curl -s -G "$MIMIR/prometheus/api/v1/query_exemplars" \
+     --data-urlencode 'query=http_server_request_duration_seconds_bucket{job="regproc-pkr"}' \
+     --data-urlencode "start=$(date -d '-10 min' +%s)" --data-urlencode "end=$(date +%s)"</pre>
+<h2>5.2 TP-2 Synthetic telemetry with telemetrygen</h2>
+<pre># traces: 100 test-tagged traces with 5 child spans, wrong site on purpose (stamping test)
+telemetrygen traces --otlp-endpoint $AGENT:4317 --otlp-insecure --traces 100 --child-spans 5 \
+  --service regproc-pkr \
+  --otlp-attributes 'deployment.environment.name="wrong-env"' --otlp-attributes 'acme.site.name="DCX"' \
+  --telemetry-attributes 'test.case.name="VT-INF-03"' --telemetry-attributes 'mosip.rid="10001100010000120261018102233"'
+
+# logs: audit stream records for routing test
+telemetrygen logs --otlp-endpoint $AGENT:4317 --otlp-insecure --logs 20 \
+  --body 'AUDIT UIN_GENERATOR ref_id=10001100010000120261018102233' \
+  --telemetry-attributes 'stream="mosip-audit"'
+
+# load: 1.5x nominal for 30 minutes
+telemetrygen traces --otlp-endpoint $AGENT:4317 --otlp-insecure --rate [1.5*X] --duration 30m --service load-test</pre>
+<p class="note">Flag names follow telemetrygen of the pinned collector release and must be checked against it before the campaign.</p>
+<h2>5.3 TP-3 Fault injection for verdict classification</h2>
+<table>
+<tr><th style="width:24%">Data set (from D1)</th><th style="width:46%">Modification</th><th>Expected verdict</th></tr>
+<tr><td>D3-a complete</td><td>None</td><td>PASS</td></tr>
+<tr><td>D3-b missing span</td><td>Remove the idgenerator server span</td><td>PASS with evidence gap (functional stub OK) or SILENT FAILURE (functional stub KO)</td></tr>
+<tr><td>D3-c error span</td><td>Status code 2 and an exception event on the identity span; functional stub KO</td><td>PRODUCT BUG</td></tr>
+<tr><td>D3-d infra event</td><td>Pod restart (OOMKilled) recorded in the window; functional stub KO</td><td>INFRA</td></tr>
+<tr><td>D3-e config rejection</td><td>Business rejection code for inactive centre; functional stub KO</td><td>TEST DATA / CONFIG</td></tr>
+<tr><td>D3-f pipeline breach</td><td>Gateway scaled to 0 during the window</td><td>INCONCLUSIVE</td></tr>
+</table>
+<h2>5.4 TP-4 Full NIN-001 run</h2>
+<ol>
+<li>Resolve the target environment (for example <code>test-int@DC1</code>) and run the prerequisite checks.</li>
+<li>Execute <code>features/nin_001_new_adult_no_hit.feature</code> with Jarvis.</li>
+<li>Let Jarvis settle, collect, seal and verify; archive the report and the evidence bundle.</li>
+<li>Verify the bundle signature and hashes independently.</li>
+</ol>
+<h2>5.5 TP-5 Evidence bundle verification</h2>
+<pre>sha256sum -c manifest.sha256        # or the verification command of the evidence collector
+# verify signature.jws against the published verification key, then recompute the verdict offline</pre>
+
+<h1>6 Test cases</h1>
+<p>Each test case lists the requirements it covers, the mode, preconditions, steps, expected result and the evidence to retain. Result fields are completed during execution.</p>
+<!--TCS-->
+
+<h1>7 Traceability</h1>
+<p>Requirement of OAEF-SPEC-001 to validation test cases.</p>
+<!--RTM-->
+
+<h1>8 Test completion report (template)</h1>
+<table>
+<tr><th style="width:34%">Item</th><th>Content</th></tr>
+<tr><td>Campaign identifier</td><td>[ ]</td></tr>
+<tr><td>Platform, site, versions</td><td>[environment, site, MOSIP release, agent, collector, backend versions]</td></tr>
+<tr><td>Period</td><td>[from — to]</td></tr>
+<tr><td>Test cases executed / passed / failed / blocked</td><td>[ ] / [ ] / [ ] / [ ]</td></tr>
+<tr><td>Requirements covered by a passed test</td><td>[ ] of [ ] (must = M: all)</td></tr>
+<tr><td>Open defects by severity</td><td>[critical / major / minor]</td></tr>
+<tr><td>Deviations from this specification</td><td>[ ]</td></tr>
+<tr><td>Evidence location</td><td>validation/&lt;campaign-id&gt;/</td></tr>
+<tr><td>Recommendation</td><td>[accept / accept with reservations / reject]</td></tr>
+</table>
+<h4>Sign-off</h4>
+<table>
+<tr><th style="width:30%">Role</th><th style="width:30%">Name</th><th style="width:20%">Date</th><th>Signature</th></tr>
+<tr><td>Test lead</td><td></td><td></td><td></td></tr>
+<tr><td>WP0 lead</td><td></td><td></td><td></td></tr>
+<tr><td>Security officer</td><td></td><td></td><td></td></tr>
+</table>
+</body></html>

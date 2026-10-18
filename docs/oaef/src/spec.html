@@ -1,0 +1,579 @@
+﻿<html><head><meta charset="utf-8"><title>Observability and Audit Evidence Framework Specification</title>
+<style>
+body { font-family: Arial, sans-serif; font-size: 10pt; }
+h1 { font-family: Arial; color: #003088; font-size: 18pt; }
+h2 { font-family: Arial; color: #003088; font-size: 14pt; }
+h3 { font-family: Arial; color: #003088; font-size: 12pt; }
+h4 { font-family: Arial; color: #3A3A3A; font-size: 10.5pt; }
+table { border-collapse: collapse; width: 100%; }
+th { background: #003088; color: #FFFFFF; font-size: 9pt; text-align: left; border: 1px solid #8C8C8C; padding: 3pt; }
+td { font-size: 9pt; border: 1px solid #8C8C8C; padding: 3pt; vertical-align: top; }
+pre { font-family: Consolas, 'Courier New', monospace; font-size: 8pt; background: #F2F2F2; border: 1px solid #D0D0D0; padding: 4pt; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
+.note { background: #F6F0E4; border: 1px solid #C6AA76; padding: 4pt; }
+</style></head><body>
+
+<!--COVER-->
+<p class="cover-title">Observability and Audit Evidence Framework Specification</p>
+<p class="cover-sub">OAEF — System requirements, architecture, deployment and qualification specification, with the MOSIP NIN issuance reference implementation</p>
+<table>
+<tr><th style="width:30%">Field</th><th>Value</th></tr>
+<tr><td>Document identifier</td><td>OAEF-SPEC-001</td></tr>
+<tr><td>Version</td><td>0.1 — Draft for review</td></tr>
+<tr><td>Date</td><td>2026-10-18</td></tr>
+<tr><td>Work package</td><td>WP0 — Shared observability, audit and evidence layer</td></tr>
+<tr><td>Owner</td><td>[Name, role]</td></tr>
+<tr><td>Classification</td><td>[To be set by the document owner]</td></tr>
+<tr><td>Companion document</td><td>OAEF-VTS-001 — Validation Test Specification</td></tr>
+<tr><td>Source repository</td><td>github.com/gharbonnier78/mosip-observability-oracles</td></tr>
+</table>
+<h4>Document control</h4>
+<table>
+<tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
+<tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft: generic layer, IaC deployment, qualification layer, MOSIP NIN reference implementation.</td></tr>
+</table>
+<h4>Approvals</h4>
+<table>
+<tr><th style="width:30%">Role</th><th style="width:30%">Name</th><th style="width:20%">Date</th><th>Signature</th></tr>
+<tr><td>Programme / WP0 lead</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+<tr><td>Test and qualification lead</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+<tr><td>Security officer / DPO</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+<tr><td>Platform / operations lead</td><td>[ ]</td><td>[ ]</td><td></td></tr>
+</table>
+<!--TOC-->
+
+<h1>1 Introduction</h1>
+<h2>1.1 Purpose</h2>
+<p>This document specifies the <b>Observability and Audit Evidence Framework (OAEF)</b>: the shared layer that makes every system delivered by the programme produce traces, logs, metrics and audit events according to a common contract, collects them as evidence, and verifies them against exact oracles derived from use cases and business rules. It is the reference for designing, deploying, operating and qualifying that layer, and for every work package that must comply with it.</p>
+<p>The framework serves three purposes with one specification:</p>
+<ul>
+<li><b>Exact validation</b> of each delivery against its contractual specification, functional and non-functional, with sealed evidence.</li>
+<li><b>Early reports</b>: realistic expected data allows reports and audit extracts to be designed and tested before the system exists, revealing missing data requirements.</li>
+<li><b>Drift detection</b> over time: data model, business rules, latency, error behaviour, signal completeness and privacy.</li>
+</ul>
+<h2>1.2 Scope</h2>
+<p>In scope:</p>
+<ul>
+<li>The <b>generic layer</b>: instrumentation conditions, collection pipeline, storage, consumption and correlation model, independent of the business domain.</li>
+<li>Its <b>deployment as code</b> (Infrastructure as Code and GitOps) on the development, test/qualification, in-house integration, performance and disaster-recovery platforms, across two sites (DC1, DC2).</li>
+<li>The <b>qualification layer</b>: test executor, synthetic data, mocks, evidence collection, oracle engine, verdict classification and reporting.</li>
+<li>A <b>reference implementation</b> on MOSIP 1.2.x for the National Identification Number (NIN) issuance journey of NIMS 2.0, including the first scenario NIN-001.</li>
+</ul>
+<p>Out of scope: production monitoring service levels, end-user support processes, and the functional design of MOSIP itself.</p>
+<h2>1.3 Intended audience</h2>
+<table>
+<tr><th style="width:30%">Audience</th><th>Use of this document</th></tr>
+<tr><td>Work-package architects and developers</td><td>Instrumentation conditions their components must meet (chapters 4 and 5).</td></tr>
+<tr><td>Platform and DevOps engineers</td><td>Deployment topology, IaC and configuration baselines (chapter 6).</td></tr>
+<tr><td>Test and qualification teams</td><td>Qualification layer, oracles and reference scenarios (chapters 7 and 8).</td></tr>
+<tr><td>Security officer, DPO, auditors</td><td>Privacy, integrity and audit trail design (chapter 9).</td></tr>
+<tr><td>Programme management and contracting authority</td><td>Requirements, traceability and open decisions (chapters 5, 11 and 12).</td></tr>
+</table>
+<h2>1.4 Definitions and acronyms</h2>
+<table>
+<tr><th style="width:24%">Term</th><th>Definition</th></tr>
+<tr><td>Signal</td><td>A trace span, log record, metric data point or audit event emitted by a component.</td></tr>
+<tr><td>Signal contract</td><td>The set of signals a component or a scenario step must emit, with their names, kinds, attributes and links.</td></tr>
+<tr><td>Oracle</td><td>A machine-checkable specification of the expected outcome of a scenario: API responses, data states, business rules, signals, audit events and non-functional limits.</td></tr>
+<tr><td>Golden run</td><td>A reviewed and approved reference execution from which deployment-specific oracle values are frozen.</td></tr>
+<tr><td>Evidence bundle</td><td>The sealed set of files collected after a scenario run (traces, logs, metrics, audit, business state, context, manifest, verdict).</td></tr>
+<tr><td>Verdict class</td><td>The automatic classification of a run: PASS, PASS with evidence gap, INCONCLUSIVE, INFRA, SILENT FAILURE, TEST DATA / CONFIG, PRODUCT BUG.</td></tr>
+<tr><td>Jarvis</td><td>The programme's test executor, which opens the root span of each scenario.</td></tr>
+<tr><td>RID / NIN / VID</td><td>MOSIP Registration ID; National Identification Number (MOSIP UIN); Virtual ID.</td></tr>
+<tr><td>OTel, OTLP</td><td>OpenTelemetry; OpenTelemetry Protocol.</td></tr>
+<tr><td>IaC, GitOps</td><td>Infrastructure as Code; operating model where the desired state in Git is reconciled to the platforms.</td></tr>
+<tr><td>WORM</td><td>Write once, read many (object lock).</td></tr>
+<tr><td>DPIA, NDPA</td><td>Data protection impact assessment; Nigeria Data Protection Act 2023.</td></tr>
+</table>
+<h2>1.5 References</h2>
+<table>
+<tr><th style="width:12%">Ref</th><th>Document</th></tr>
+<tr><td>[R1]</td><td>ISO/IEC/IEEE 29148:2018 — Requirements engineering (structure of this specification).</td></tr>
+<tr><td>[R2]</td><td>ISO/IEC/IEEE 42010:2022 — Architecture description (views in chapter 3).</td></tr>
+<tr><td>[R3]</td><td>ISO/IEC/IEEE 29119-3:2021 — Test documentation (companion validation document).</td></tr>
+<tr><td>[R4]</td><td>OpenTelemetry specification, OTLP 1.x protocol and JSON encoding.</td></tr>
+<tr><td>[R5]</td><td>OpenTelemetry semantic conventions (resource, HTTP, database, messaging, CICD, test) — version pinned per platform release.</td></tr>
+<tr><td>[R6]</td><td>W3C Trace Context; W3C Baggage.</td></tr>
+<tr><td>[R7]</td><td>MOSIP 1.2.x LTS documentation and API specifications (docs.mosip.io; GitHub mosip/*).</td></tr>
+<tr><td>[R8]</td><td>Nigeria Data Protection Act 2023.</td></tr>
+<tr><td>[R9]</td><td>OAEF-VTS-001 — Validation Test Specification (companion).</td></tr>
+<tr><td>[R10]</td><td>Repository mosip-observability-oracles: scenario catalogue, models, oracles, configuration, draw.io diagrams.</td></tr>
+</table>
+<h2>1.6 Conventions</h2>
+<ul>
+<li>Requirement identifiers: <code>OAEF-&lt;domain&gt;-&lt;nn&gt;</code>; domains SW (software and instrumentation), TST (qualification layer), INF (infrastructure), SEC (security and privacy), DQ (telemetry data quality), OPS (operations and governance). They correspond one-to-one to the WP0 identifiers <code>WP0-&lt;domain&gt;-&lt;nn&gt;</code>.</li>
+<li>Priority: <b>M</b> must, <b>S</b> should, <b>C</b> could.</li>
+<li>Verification method: <b>T</b> test, <b>D</b> demonstration, <b>I</b> inspection, <b>A</b> analysis. Each requirement is verified by at least one test case of [R9].</li>
+<li>Values in <b>[brackets]</b> and items marked <b>[A]</b> are assumptions or parameters to be agreed; none is a measured value.</li>
+<li>The organisation attribute namespace is written <code>acme.*</code> as a placeholder until decided.</li>
+</ul>
+
+<h1>2 System context</h1>
+<h2>2.1 Problem statement and goals</h2>
+<p>In a distributed, event-driven system spanning web and mobile clients, offline registration stations, gateways, many services, message brokers, databases and two data centres, a failed test has three possible causes: a product defect, an infrastructure problem, or missing evidence. Without designed signals these cannot be told apart, and every failure becomes a manual investigation. Retrofitting signals after delivery means changing code and re-running the tests.</p>
+<table>
+<tr><th style="width:10%">Goal</th><th>Description</th></tr>
+<tr><td>G1</td><td>Every delivery emits the signals of its contract, tagged with environment, site, test run and business keys.</td></tr>
+<tr><td>G2</td><td>Every scenario run produces a sealed evidence bundle and an automatic verdict against an exact oracle.</td></tr>
+<tr><td>G3</td><td>Every failure is classified to its probable first source and linked to an investigation view.</td></tr>
+<tr><td>G4</td><td>Personal data never appears in clear in signals; audit trails are immutable and access-controlled.</td></tr>
+<tr><td>G5</td><td>The same layer serves development, qualification, integration, performance and DR testing on both sites.</td></tr>
+</table>
+<h2>2.2 Stakeholders and concerns</h2>
+<table>
+<tr><th style="width:26%">Stakeholder</th><th>Main concerns</th></tr>
+<tr><td>Contracting authority</td><td>Acceptance against the contract, objective proof, compliance.</td></tr>
+<tr><td>Work-package teams</td><td>Clear instrumentation rules, fast feedback, low overhead.</td></tr>
+<tr><td>Test and qualification team</td><td>Deterministic verdicts, reproducibility, triage time.</td></tr>
+<tr><td>Platform operations</td><td>Capacity, reliability of the pipeline, maintainability, upgrades.</td></tr>
+<tr><td>Security officer, DPO</td><td>No PII leakage, access control, integrity, retention limits.</td></tr>
+<tr><td>Auditors and regulator</td><td>Complete, immutable audit trail linked to business events.</td></tr>
+</table>
+<h2>2.3 System context</h2>
+<p>The framework interfaces with the following external systems (draw.io page 1 shows the full component view).</p>
+<table>
+<tr><th style="width:26%">External system</th><th style="width:40%">Interaction</th><th>Interface</th></tr>
+<tr><td>Systems under test (MOSIP services, stations, portals, apps)</td><td>Emit traces, logs, metrics; write audit and business data</td><td>OTLP gRPC 4317 / HTTP 4318; MOSIP audit API; databases (read-only access for evidence)</td></tr>
+<tr><td>Environment configuration manager (COTS)</td><td>Source of environment, site, role and cluster identity</td><td>REST API of the product, synchronised to GitOps</td></tr>
+<tr><td>CI/CD and test management</td><td>Trigger runs, receive results</td><td>Pipeline API; result import (JUnit, Cucumber JSON); scenario tags</td></tr>
+<tr><td>Partner simulators and partners</td><td>ABIS, SMS/email, relying parties, WebSub subscribers</td><td>Their protocols; trace context accepted only from authorised partners</td></tr>
+<tr><td>Identity provider</td><td>Single sign-on and roles for consumers</td><td>OIDC</td></tr>
+<tr><td>Key management / HSM</td><td>Evidence signature</td><td>MOSIP Keymanager jwtSign or KMS</td></tr>
+</table>
+<h2>2.4 Operational concept</h2>
+<table>
+<tr><th style="width:16%">Platform</th><th style="width:30%">Purpose</th><th style="width:14%">Data</th><th style="width:16%">Sampling</th><th>Retention (traces / logs / metrics / audit / evidence)</th></tr>
+<tr><td>DEV</td><td>Developer integration, early contract checks</td><td>Synthetic</td><td>100 %</td><td>[3 d] / [7 d] / [15 d] / [30 d] / —</td></tr>
+<tr><td>TEST / QUAL</td><td>Qualification campaigns, golden runs</td><td>Synthetic</td><td>100 % of test traffic</td><td>[14 d] / [30 d] / [90 d] / [1 y] / [contract]</td></tr>
+<tr><td>INT</td><td>In-house integration with simulators and devices</td><td>Synthetic</td><td>100 %</td><td>as TEST</td></tr>
+<tr><td>PERF [optional]</td><td>Load and soak tests</td><td>Synthetic</td><td>Tail-based [10 %] + errors + test-tagged</td><td>[7 d] / [14 d] / [90 d] / [90 d] / [90 d]</td></tr>
+<tr><td>DR-TEST</td><td>Multi-site and failover tests on DC1 and DC2</td><td>Synthetic</td><td>100 %</td><td>as TEST</td></tr>
+</table>
+<p>Principal use cases of the framework: <b>UC-F1</b> emit signals during a journey; <b>UC-F2</b> run a scenario and open its root span; <b>UC-F3</b> collect and seal evidence; <b>UC-F4</b> verify against the oracle and classify; <b>UC-F5</b> investigate from the report; <b>UC-F6</b> consult the audit trail; <b>UC-F7</b> detect drift across releases.</p>
+<h2>2.5 Constraints</h2>
+<ul>
+<li>MOSIP is a third-party open-source platform: changes are made by agent extension and configuration first; code changes are minimal, documented and proposed upstream.</li>
+<li>OpenTelemetry semantic conventions used here are partly at "development" stability: versions are pinned per platform release.</li>
+<li>Only synthetic personal data may be used on non-production platforms [R8].</li>
+<li>Registration stations operate offline for extended periods [A: up to 72 h].</li>
+</ul>
+<h2>2.6 Assumptions and dependencies</h2>
+<ul>
+<li>[A] Kubernetes is the runtime for MOSIP and for the framework on both sites.</li>
+<li>[A] An environment configuration manager product is available and authoritative for environment identity.</li>
+<li>[A] NIMS 2.0 keeps an 11-digit NIN; the oracle reads the length from configuration.</li>
+<li>Dependency: ABIS vendor capability to propagate trace context through its queues (open decision D4).</li>
+</ul>
+
+<h1>3 Architecture of the generic layer</h1>
+<h2>3.1 Architectural principles</h2>
+<table>
+<tr><th style="width:8%">ID</th><th style="width:28%">Principle</th><th>Rationale</th></tr>
+<tr><td>P1</td><td>Observability first</td><td>Signals are designed with the system, because the oracle can only expect what the system can emit.</td></tr>
+<tr><td>P2</td><td>Standards before custom</td><td>OpenTelemetry, W3C Trace Context and semantic conventions wherever they exist; organisation namespace only where none exists.</td></tr>
+<tr><td>P3</td><td>Extend, do not fork</td><td>Agent extensions and configuration rather than changes to MOSIP code.</td></tr>
+<tr><td>P4</td><td>Where is a resource fact</td><td>Environment and site are resource attributes stamped by the cluster collector, not request headers.</td></tr>
+<tr><td>P5</td><td>Privacy by design</td><td>Identifiers are hashed; PII is denied at source and at the gateway.</td></tr>
+<tr><td>P6</td><td>Everything as code</td><td>Infrastructure, pipeline configuration, dashboards, oracles and scenarios are versioned and reviewed.</td></tr>
+<tr><td>P7</td><td>Same stores for operations and evidence</td><td>Investigation and verification read the same data, so a verdict can always be inspected.</td></tr>
+</table>
+<h2>3.2 Logical view</h2>
+<table>
+<tr><th style="width:20%">Layer</th><th style="width:40%">Responsibility</th><th>Main components</th></tr>
+<tr><td>L1 Instrumentation</td><td>Produce signals with context and business keys</td><td>OTel Java agent and MOSIP extension; browser and mobile SDKs; station SDK; gateway tracing; structured logging; audit client</td></tr>
+<tr><td>L2 Collection</td><td>Receive, enrich, stamp environment and site</td><td>OTel Operator; collector agent per node; Prometheus scraping</td></tr>
+<tr><td>L3 Pipeline</td><td>Sample, redact, derive, route</td><td>Collector gateway (tail sampling, redaction, span metrics, service graph, audit routing, load balancing)</td></tr>
+<tr><td>L4 Storage</td><td>Persist signals, audit and evidence</td><td>Tempo; Loki (application and audit tenants); Mimir; object storage with object lock; MOSIP audit database</td></tr>
+<tr><td>L5 Consumption</td><td>Investigate, alert, audit</td><td>Grafana; alerting; auditor access; query helper for hashed identifiers</td></tr>
+<tr><td>L6 Qualification</td><td>Execute, collect, verify, classify, report</td><td>Jarvis; data generator; mocks; evidence collector; oracle engine; reporter</td></tr>
+</table>
+<h2>3.3 Component catalogue</h2>
+<table>
+<tr><th style="width:24%">Component</th><th style="width:16%">Layer</th><th style="width:34%">Function</th><th>Technology (reference)</th></tr>
+<tr><td>Java instrumentation</td><td>L1</td><td>Spans, metrics, logs for all Java services</td><td>OpenTelemetry Java agent, pinned</td></tr>
+<tr><td>MOSIP OTel extension</td><td>L1</td><td>Business keys on spans and MDC; propagation over the event bus</td><td>Agent extension jar (to build)</td></tr>
+<tr><td>Audit correlation</td><td>L1</td><td>trace_id/span_id on audit events; audit as OTLP log</td><td>Audit client patch</td></tr>
+<tr><td>Collector agent</td><td>L2</td><td>OTLP receiver, Kubernetes metadata, environment/site stamp</td><td>OpenTelemetry Collector (DaemonSet)</td></tr>
+<tr><td>Collector gateway</td><td>L3</td><td>Tail sampling, redaction, span metrics, routing</td><td>OpenTelemetry Collector (Deployment, HA)</td></tr>
+<tr><td>Trace store</td><td>L4</td><td>Traces, TraceQL</td><td>Grafana Tempo</td></tr>
+<tr><td>Log store</td><td>L4</td><td>Logs (app tenant), audit (audit tenant)</td><td>Grafana Loki</td></tr>
+<tr><td>Metric store</td><td>L4</td><td>Metrics with exemplars, PromQL</td><td>Grafana Mimir</td></tr>
+<tr><td>Object storage</td><td>L4</td><td>Chunks, blocks, evidence bucket, object lock</td><td>S3-compatible (MinIO or equivalent)</td></tr>
+<tr><td>Grafana</td><td>L5</td><td>Explore, dashboards, correlations, annotations</td><td>Grafana</td></tr>
+<tr><td>Jarvis</td><td>L6</td><td>Scenario execution, root span</td><td>Cucumber/TestNG with OTel SDK</td></tr>
+<tr><td>Evidence collector</td><td>L6</td><td>Settle, query, seal, upload</td><td>Service or library of Jarvis</td></tr>
+<tr><td>Oracle engine</td><td>L6</td><td>Match oracle, classify verdict</td><td>Library with JSON Schemas</td></tr>
+</table>
+<h2>3.4 Runtime view</h2>
+<p>The runtime flow is drawn on draw.io page 6. Summary:</p>
+<ol>
+<li>Jarvis opens the ROOT span and calls the system under test with W3C <code>traceparent</code> and <code>baggage</code>.</li>
+<li>Components emit OTLP spans, logs and metrics, and write audit and business rows.</li>
+<li>The cluster collector stamps environment and site; the gateway keeps every test trace, redacts PII, derives span metrics and routes audit records to the audit tenant.</li>
+<li>After a settle window, the evidence collector queries the stores and read-only databases, builds the manifest and seals the bundle in WORM storage.</li>
+<li>The oracle engine verifies the bundle, classifies the verdict and writes the report with deep links.</li>
+<li>Investigators open Grafana on the exact trace and time window.</li>
+</ol>
+<h2>3.5 Correlation model</h2>
+<table>
+<tr><th style="width:30%">Key</th><th style="width:28%">Links</th><th style="width:24%">Survives</th><th>Convention</th></tr>
+<tr><td>trace_id, span_id</td><td>One causal chain</td><td>Synchronous calls, propagated messages</td><td>W3C Trace Context</td></tr>
+<tr><td>cicd.pipeline.run.id, test.case.name, test.suite.name</td><td>Test run and scenario</td><td>Every span of the journey (baggage)</td><td>OTel CICD and Test</td></tr>
+<tr><td>mosip.rid, mosip.uin_hash, mosip.request_id</td><td>Business object lifecycle</td><td>New traces, batches, audit, database rows</td><td>Domain namespace</td></tr>
+<tr><td>Actor ids (operator, device, user hash)</td><td>Human or technical actor</td><td>Sessions, channels, offline sync</td><td>Domain, hashed</td></tr>
+<tr><td>deployment.environment.name, k8s.cluster.name, acme.site.name</td><td>Where it happened</td><td>Everything (resource)</td><td>OTel and organisation</td></tr>
+</table>
+<h2>3.6 Multi-environment and multi-site view</h2>
+<p>Each site runs its own collection, pipeline and storage stack; evidence and audit buckets replicate from DC1 to DC2. Environment and site identity come from the environment configuration manager, are rendered into GitOps, and are enforced by the collector agent of each cluster (upsert of resource attributes). Cross-site calls appear as parent and child spans with different <code>acme.site.name</code>, which disaster-recovery oracles assert.</p>
+
+<h1>4 Data and interface specification</h1>
+<h2>4.1 Signal types and encoding</h2>
+<table>
+<tr><th style="width:16%">Signal</th><th style="width:44%">Encoding and transport</th><th>Mandatory content</th></tr>
+<tr><td>Traces</td><td>OTLP over gRPC (4317) or HTTP (4318); JSON encoding: ids lowercase hex, 64-bit integers as strings, enums as integers</td><td>traceId, spanId, parentSpanId, name, kind, start/end time, status, resource attributes, required attributes</td></tr>
+<tr><td>Logs</td><td>OTLP logs (agent logback appender) or JSON stdout parsed by filelog receiver</td><td>time, severityNumber/Text, body, traceId, spanId, flags, business keys</td></tr>
+<tr><td>Metrics</td><td>OTLP metrics; Prometheus scraping for exporters</td><td>Standard names and units; exemplars with trace_id</td></tr>
+<tr><td>Audit</td><td>MOSIP audit API to audit database, plus OTLP log to the audit tenant</td><td>Audit fields (4.4) plus trace_id, span_id</td></tr>
+</table>
+<p>Note: the Tempo JSON API returns trace and span ids in base64; consumers normalise to hex.</p>
+<h2>4.2 Attribute registry</h2>
+<table>
+<tr><th style="width:30%">Attribute</th><th style="width:12%">Level</th><th style="width:28%">Example</th><th>Source</th></tr>
+<tr><td>service.name, service.namespace, service.version, service.instance.id</td><td>resource</td><td>regproc-pkr, mosip, 1.2.0.1</td><td>Deployment, operator</td></tr>
+<tr><td>deployment.environment.name</td><td>resource</td><td>test-int</td><td>Environment manager</td></tr>
+<tr><td>k8s.cluster.name, k8s.namespace.name, k8s.pod.name</td><td>resource</td><td>dc1-k8s-test</td><td>Environment manager, k8sattributes</td></tr>
+<tr><td>acme.site.name, acme.site.role, acme.env.id, acme.env.config.version</td><td>resource</td><td>DC1, primary, ENV-000123</td><td>Environment manager</td></tr>
+<tr><td>cicd.pipeline.name, cicd.pipeline.run.id</td><td>span (baggage)</td><td>run-20261018-001</td><td>CI</td></tr>
+<tr><td>test.suite.name, test.case.name, test.case.result.status</td><td>span</td><td>TC-NIN, NIN-001, pass</td><td>Jarvis</td></tr>
+<tr><td>acme.test.verdict, acme.test.persona</td><td>ROOT span</td><td>PASS, adult-nohit</td><td>Jarvis</td></tr>
+<tr><td>mosip.rid, mosip.uin_hash, mosip.vid_hash, mosip.request_id, mosip.partner_id, mosip.reg_type, mosip.stage</td><td>span, log</td><td>29-digit RID; salted hash</td><td>MOSIP extension</td></tr>
+<tr><td>HTTP, database, messaging attributes</td><td>span</td><td>http.response.status_code, db.namespace, messaging.destination.name</td><td>Agent (semantic conventions)</td></tr>
+</table>
+<h2>4.3 Context propagation</h2>
+<table>
+<tr><th style="width:26%">Boundary</th><th>Mechanism</th></tr>
+<tr><td>HTTP (internal and gateway)</td><td>W3C traceparent, tracestate, baggage headers</td></tr>
+<tr><td>Kafka / Vert.x event bus</td><td>Context in record headers; verified for every regproc stage; extension where the agent does not propagate</td></tr>
+<tr><td>JMS (ABIS)</td><td>Context in message properties; span link if the vendor does not propagate</td></tr>
+<tr><td>Credential batch, WebSub</td><td>Originating traceparent stored with the request; span link from the new trace</td></tr>
+<tr><td>Offline station packet</td><td>traceparent stored in packet metadata, restored by the packet receiver</td></tr>
+<tr><td>Partners (egress / ingress)</td><td>Baggage stripped on egress; inbound traceparent accepted from authorised partners only</td></tr>
+</table>
+<h2>4.4 Audit event model</h2>
+<table>
+<tr><th style="width:28%">Field (MOSIP AuditRequestDto / app_audit_log)</th><th>Content</th></tr>
+<tr><td>eventId, eventName, eventType</td><td>Release-specific codes, frozen from the golden run</td></tr>
+<tr><td>actionTimeStamp, hostName, hostIp</td><td>When and where</td></tr>
+<tr><td>applicationId, applicationName, moduleId, moduleName</td><td>Which component and stage</td></tr>
+<tr><td>sessionUserId, sessionUserName</td><td>Actor (pseudonymised where personal)</td></tr>
+<tr><td>id, idType</td><td>Business reference: RID or NIN hash</td></tr>
+<tr><td><b>trace_id, span_id (added)</b></td><td>Link to the producing span (OAEF-SW-05)</td></tr>
+</table>
+<h2>4.5 Evidence bundle format</h2>
+<pre>evidence/&lt;run-id&gt;/&lt;scenario-id&gt;/
+  manifest.json        ids, time window, environment, site, component versions, exact queries, SHA-256 per file
+  signature.jws        signature of manifest.json
+  traces/&lt;trace_id&gt;.json   OTLP JSON
+  logs.ndjson          log records (app tenant)
+  audit.json           audit DB rows and audit-tenant records
+  metrics.json         values at t0 and t_end, exemplars
+  business.json        API responses and database states
+  context.json         infrastructure and pipeline health in the window
+  verdict.json         check results, coverage, verdict class, first source
+  links.md             Grafana deep links</pre>
+<h2>4.6 Oracle definition language</h2>
+<p>An oracle is a YAML document with sections <code>metadata, settle, rules, api, db, notification, traces, logs, metrics, audit, nfr, verdict</code>. Matchers: literal (typed equality), <code>$re</code>, <code>$cap</code>, <code>$ref</code>, <code>$in</code>, <code>$gte</code>, <code>$lte</code>, <code>$exists</code>, <code>$golden</code>; span relations <code>parent</code>, <code>parent_ancestor</code>, <code>parent_kind</code>, <code>after</code>, <code>count</code>; collection checks <code>ordered_subsequence</code>. Values defined by a standard are explicit; deployment-specific values are frozen from the golden run. The schema of each file type is validated in CI (OAEF-TST-03).</p>
+<h2>4.7 External interfaces</h2>
+<table>
+<tr><th style="width:28%">Interface</th><th style="width:36%">Endpoint (reference)</th><th>Used by</th></tr>
+<tr><td>OTLP ingestion</td><td>gRPC :4317, HTTP :4318 /v1/traces, /v1/logs, /v1/metrics</td><td>All instrumented components</td></tr>
+<tr><td>Trace query</td><td>Tempo /api/search (TraceQL), /api/v2/traces/{id}</td><td>Evidence collector, Grafana</td></tr>
+<tr><td>Log query</td><td>Loki /loki/api/v1/query_range, header X-Scope-OrgID</td><td>Evidence collector, Grafana</td></tr>
+<tr><td>Metric query</td><td>Mimir /prometheus/api/v1/query, query_range, query_exemplars</td><td>Evidence collector, Grafana</td></tr>
+<tr><td>Annotations</td><td>Grafana /api/annotations</td><td>Oracle engine</td></tr>
+<tr><td>Evidence store</td><td>S3 API with object lock</td><td>Evidence collector, auditors</td></tr>
+<tr><td>Environment identity</td><td>Environment manager REST API</td><td>Sync job, Jarvis</td></tr>
+</table>
+
+<h1>5 Requirements</h1>
+<p>Each requirement lists its priority, verification method (T test, D demonstration, I inspection, A analysis) and acceptance criterion. Gap identifiers refer to section 5.7.</p>
+<!--REQS-->
+
+<h1>6 Deployment and Infrastructure as Code</h1>
+<h2>6.1 Deployment topology</h2>
+<table>
+<tr><th style="width:24%">Unit</th><th style="width:22%">Per</th><th>Content</th></tr>
+<tr><td>Kubernetes cluster</td><td>Platform and site</td><td>MOSIP namespaces, framework namespaces (observability, qualification)</td></tr>
+<tr><td>Collector agent</td><td>Node (DaemonSet)</td><td>OTLP receiver, k8sattributes, site stamp</td></tr>
+<tr><td>Collector gateway</td><td>Cluster (≥ 2 replicas)</td><td>Load-balancing exporter tier and sampling tier</td></tr>
+<tr><td>Storage stack</td><td>Site</td><td>Tempo, Loki, Mimir, Grafana, Alertmanager</td></tr>
+<tr><td>Object storage</td><td>Site, replicated DC1 → DC2</td><td>Store buckets; audit and evidence buckets with object lock</td></tr>
+<tr><td>CI runners</td><td>Platform</td><td>Jarvis, evidence collector, oracle engine</td></tr>
+</table>
+<h2>6.2 Repository layout (GitOps)</h2>
+<pre>platform-gitops/
+  terraform/                  clusters, networks, DNS, buckets, object-lock policies
+    modules/  envs/dc1/  envs/dc2/
+  clusters/&lt;site&gt;-&lt;platform&gt;/    Argo CD applications per cluster
+  charts-values/
+    otel-operator/  collector-agent/  collector-gateway/
+    tempo/  loki/  mimir/  grafana/  alertmanager/
+  overlays/&lt;platform&gt;/&lt;site&gt;/     Kustomize: retention, sampling, tenants, env/site stamp (generated)
+  dashboards/  alert-rules/  grafana-datasources/
+  policies/                   network policies, admission (signed images), RBAC
+mosip-observability-oracles/  scenarios, oracles, personas, prerequisites, models (this programme)</pre>
+<h2>6.3 IaC toolchain</h2>
+<table>
+<tr><th style="width:22%">Concern</th><th style="width:30%">Tool (reference)</th><th>Rule</th></tr>
+<tr><td>Cloud / on-prem resources</td><td>Terraform (or OpenTofu)</td><td>State remote and locked; plan reviewed in pull request</td></tr>
+<tr><td>Cluster workloads</td><td>Helm charts + Argo CD</td><td>Pinned chart and image versions; automated sync with drift alarm</td></tr>
+<tr><td>Per-environment differences</td><td>Kustomize overlays</td><td>Generated from the environment manager; never edited by hand</td></tr>
+<tr><td>Secrets</td><td>Vault with external-secrets</td><td>No secret in Git</td></tr>
+<tr><td>Policy</td><td>Admission controller (e.g. Kyverno or Gatekeeper)</td><td>Signed images, required labels, resource limits</td></tr>
+</table>
+<h2>6.4 Configuration baselines</h2>
+<h3>6.4.1 Instrumentation (OTel Operator)</h3>
+<pre>apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+spec:
+  propagators: [tracecontext, baggage]
+  sampler: { type: parentbased_always_on }
+  resource:
+    resourceAttributes:
+      service.namespace: mosip
+      deployment.environment.name: test-int      # generated
+      k8s.cluster.name: dc1-k8s-test             # generated
+      acme.site.name: DC1                        # generated
+  java:
+    env:
+      - { name: OTEL_SEMCONV_STABILITY_OPT_IN, value: database }
+      - { name: OTEL_LOGS_EXPORTER, value: otlp }
+      - { name: OTEL_METRICS_EXEMPLAR_FILTER, value: trace_based }</pre>
+<h3>6.4.2 Collector agent (site stamp)</h3>
+<pre>processors:
+  k8sattributes: { extract: { otel_annotations: true } }
+  resource/site-stamp:
+    attributes:
+      - { key: deployment.environment.name, value: test-int, action: upsert }
+      - { key: k8s.cluster.name,            value: dc1-k8s-test, action: upsert }
+      - { key: acme.site.name,              value: DC1, action: upsert }
+service:
+  pipelines:
+    traces:  { receivers: [otlp], processors: [memory_limiter, k8sattributes, resource/site-stamp, batch], exporters: [otlp/gateway] }</pre>
+<h3>6.4.3 Collector gateway</h3>
+<pre>processors:
+  tail_sampling:
+    decision_wait: 30s
+    policies:
+      - { name: keep-test, type: string_attribute, string_attribute: { key: test.case.name, values: [".+"], enabled_regex_matching: true } }
+      - { name: keep-errors, type: status_code, status_code: { status_codes: [ERROR] } }
+  redaction/pii: { blocked_values: ["[0-9]{10,11}", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+"] }   # illustrative patterns
+  routing/audit: route log records with attribute stream=mosip-audit to the audit exporter
+connectors:
+  spanmetrics: { resource_metrics_key_attributes: [service.name, deployment.environment.name, acme.site.name] }
+exporters:
+  otlp/tempo, otlphttp/loki-app (X-Scope-OrgID: app), otlphttp/loki-audit (X-Scope-OrgID: audit), otlphttp/mimir</pre>
+<p class="note">Configuration excerpts are references; exact keys must be checked against the pinned collector and backend versions.</p>
+<h3>6.4.4 Backends</h3>
+<ul>
+<li>Loki: OTLP index labels for <code>acme.site.name</code>, <code>acme.site.role</code> in addition to defaults; tenants app and audit; retention per platform.</li>
+<li>Mimir: promotion of <code>deployment.environment.name</code>, <code>k8s.cluster.name</code>, <code>acme.site.name</code>, <code>service.namespace</code> to series labels.</li>
+<li>Tempo: dedicated columns for environment, site, <code>mosip.rid</code>, <code>test.case.name</code>.</li>
+</ul>
+<h2>6.5 Environment and site stamping</h2>
+<p>A sync job reads each environment record from the environment manager and renders: namespace annotations <code>resource.opentelemetry.io/&lt;attribute&gt;</code>, the Instrumentation resource, the collector site stamp and the Jarvis prerequisite file. A drift check compares the rendered values with the live collectors before every campaign (OAEF-INF-07).</p>
+<h2>6.6 Promotion and change management</h2>
+<ul>
+<li>Changes flow DEV → TEST → INT → PERF/DR by pull request and tag; each platform release pins agent, collector, backend and semantic-convention versions.</li>
+<li>An agent or semantic-convention upgrade triggers re-recording and review of golden runs (OAEF-TST-04).</li>
+</ul>
+<h2>6.7 Capacity and retention parameters</h2>
+<table>
+<tr><th style="width:40%">Parameter</th><th>Value to agree</th></tr>
+<tr><td>Span ingest rate per platform</td><td>[X spans/s]</td></tr>
+<tr><td>Log ingest rate per platform</td><td>[Y lines/s]</td></tr>
+<tr><td>Active series per platform</td><td>[Z]</td></tr>
+<tr><td>Load-test margin</td><td>[1.5 ×] nominal</td></tr>
+<tr><td>Retention per platform</td><td>Section 2.4</td></tr>
+</table>
+
+<h1>7 Qualification layer</h1>
+<h2>7.1 Concepts</h2>
+<p>A <b>scenario</b> is an executable path through a use case, written in Gherkin and bound by tags to a <b>persona</b> (data contract), a set of <b>prerequisites</b> and an <b>oracle</b>. Each run produces an <b>evidence bundle</b> and a <b>verdict</b>.</p>
+<h2>7.2 Components</h2>
+<table>
+<tr><th style="width:24%">Component</th><th>Function</th></tr>
+<tr><td>Jarvis executor</td><td>Resolves the target environment, checks prerequisites, opens the ROOT span with baggage, executes steps as child spans.</td></tr>
+<tr><td>Data generator</td><td>Produces residents compliant with the live ID schema and the persona, deterministic by seed, unique against the gallery.</td></tr>
+<tr><td>Mocks and simulators</td><td>ABIS (NO_HIT, HIT, TIMEOUT, FAILURE), SMTP/SMS with read API, relying party, WebSub subscriber — all instrumented.</td></tr>
+<tr><td>Evidence collector</td><td>Settle window, queries, manifest, hashing, signature, upload.</td></tr>
+<tr><td>Oracle engine</td><td>Matches the oracle, computes signal-contract coverage, classifies the verdict.</td></tr>
+<tr><td>Reporter</td><td>Per-clause results, first source, Grafana links; export to test management.</td></tr>
+</table>
+<h2>7.3 Execution lifecycle</h2>
+<ol>
+<li>Resolve environment and site from the environment manager; run prerequisite checks (otherwise ENV_NOT_READY).</li>
+<li>Record metric baselines; open ROOT span; execute steps.</li>
+<li>End spans; wait for the settle window (minimum [40 s], two stable polls [15 s] apart, maximum [300 s] otherwise INCONCLUSIVE).</li>
+<li>Collect traces, logs, metrics, audit, business state and context; build manifest; seal and upload.</li>
+<li>Verify functional, non-functional and signal-contract sections; classify; report; annotate Grafana.</li>
+</ol>
+<h2>7.4 Verdict classification</h2>
+<table>
+<tr><th style="width:24%">Verdict</th><th style="width:46%">Condition</th><th>Owner</th></tr>
+<tr><td>PASS</td><td>Functional checks pass and signal contract 100 %</td><td>—</td></tr>
+<tr><td>PASS, evidence gap</td><td>Functional checks pass, a signal or audit event missing</td><td>Observability</td></tr>
+<tr><td>INCONCLUSIVE</td><td>Evidence pipeline unhealthy or settle window exceeded</td><td>Platform, then rerun</td></tr>
+<tr><td>INFRA</td><td>Functional failure with infrastructure anomaly in the window</td><td>Operations</td></tr>
+<tr><td>SILENT FAILURE</td><td>Functional failure without error signal at the failing step</td><td>Development and observability</td></tr>
+<tr><td>TEST DATA / CONFIG</td><td>Business rejection due to reference data or partner configuration</td><td>Test environment</td></tr>
+<tr><td>PRODUCT BUG</td><td>Error span with exception, infrastructure clean</td><td>Development</td></tr>
+</table>
+<h2>7.5 Reporting and investigation</h2>
+<p>The report lists, per contractual clause, the expected value, the actual value and the evidence file; it gives the probable first source and a Grafana deep link scoped to trace, time window, environment and site. Root-cause analysis then proceeds from the evidence to the relevant code: service code, test code, infrastructure as code, gateway and WAF rules, reference data, or observability configuration.</p>
+<h2>7.6 Golden-run governance</h2>
+<p>A golden run is recorded on a validated platform, reviewed by a functional owner and an observability owner, approved by pull request, and frozen into the oracle. It is re-recorded on any platform release that changes agent, semantic conventions or MOSIP version.</p>
+
+<h1>8 Reference implementation: MOSIP NIN issuance (NIMS 2.0)</h1>
+<h2>8.1 Use case and actors</h2>
+<p>Actors: resident applicant, enrolment officer, supervisor, introducer, adjudicator, auditor; enrolment station, central platform (MOSIP), ABIS, messaging gateway, relying party. Use cases: enrol resident, capture biometrics, issue acknowledgement (RID slip), upload packet, validate packet, deduplicate identity, adjudicate possible duplicate, issue NIN and VID, activate identity and issue credential, notify resident, verify NIN, introduce child applicant, consult audit trail. Model: <code>models/nin-usecase.puml</code>.</p>
+<h2>8.2 Activity and rules</h2>
+<p>The activity (model <code>models/nin-enrolment-activity.puml</code>) runs across five lanes: resident, messaging, enrolment station, central platform and ABIS. The station captures data and biometrics, prints the RID slip and uploads the packet, queuing it while offline; the platform validates the packet, deduplicates through the ABIS, routes possible matches to adjudication, otherwise generates the NIN and VID, activates the identity, issues the credential and notifies the resident.</p>
+<h2>8.3 Requirement register</h2>
+<table>
+<tr><th style="width:9%">Tag</th><th style="width:61%">Requirement</th><th>Verified by</th></tr>
+<tr><td>F-01</td><td>Demographics and documents validated against ID schema and reference data</td><td>NIN-001, NIN-026, NIN-027</td></tr>
+<tr><td>F-02</td><td>10 fingers, 2 irises, face; quality check; exception path</td><td>NIN-001, NIN-002, NIN-029</td></tr>
+<tr><td>F-03</td><td>Supervisor approval; RID slip issued</td><td>NIN-001, NIN-028</td></tr>
+<tr><td>F-04</td><td>Packet integrity, centre/machine/operator validity, schema conformance; reject with reason</td><td>NIN-020 to NIN-027</td></tr>
+<tr><td>F-05</td><td>Demographic and biometric deduplication via ABIS</td><td>NIN-001, NIN-010 to NIN-014</td></tr>
+<tr><td>F-06</td><td>Possible match to manual adjudication; no NIN until resolved</td><td>NIN-010 to NIN-012</td></tr>
+<tr><td>F-07</td><td>Exactly one NIN (11 digits, check digit [A]) and one perpetual VID</td><td>NIN-001</td></tr>
+<tr><td>F-08</td><td>Identity activated; credential issued to verification partners</td><td>NIN-001, NIN-056</td></tr>
+<tr><td>F-09</td><td>Notification by SMS and email in the chosen language</td><td>NIN-001, NIN-004, NIN-074</td></tr>
+<tr><td>F-10</td><td>Immutable audit event per business step, linked to RID or NIN hash</td><td>All</td></tr>
+<tr><td>F-11</td><td>Relying party verifies NIN or VID</td><td>NIN-050 to NIN-055</td></tr>
+<tr><td>F-12</td><td>Child under five enrolled with introducer</td><td>NIN-003</td></tr>
+<tr><td>NF-01</td><td>Station session ≤ [15] min (adult, no exception) [A]</td><td>NIN-001</td></tr>
+<tr><td>NF-02</td><td>≤ 3 capture retries per modality [A]</td><td>NIN-002, NIN-029</td></tr>
+<tr><td>NF-03</td><td>Offline ≥ [72] h, no data loss, automatic sync [A]</td><td>NIN-070, offline NIN-001</td></tr>
+<tr><td>NF-04</td><td>Upload to NIN ≤ [24] h (no hit, normal load) [A]</td><td>NIN-001</td></tr>
+<tr><td>NF-05</td><td>Notification ≤ [15] min after issuance [A]</td><td>NIN-001</td></tr>
+<tr><td>NF-06</td><td>DR: RPO ≤ [15] min, RTO ≤ [4] h [A]</td><td>NIN-080 to NIN-082</td></tr>
+<tr><td>NF-07</td><td>No PII in clear in signals; audit immutable and access-controlled</td><td>All</td></tr>
+<tr><td>NF-08</td><td>Signal contract 100 %, every signal tagged with environment and site</td><td>All, NIN-090 to NIN-093</td></tr>
+<tr><td>NF-09</td><td>Languages English, Hausa, Yoruba, Igbo [A]</td><td>NIN-004</td></tr>
+</table>
+<h2>8.4 Scenario catalogue</h2>
+<table>
+<tr><th style="width:26%">Family</th><th style="width:16%">IDs</th><th>Examples</th></tr>
+<tr><td>Nominal issuance</td><td>NIN-001 to 005</td><td>Adult no hit, biometric exception, child, second language, pre-registered</td></tr>
+<tr><td>Deduplication</td><td>NIN-010 to 014</td><td>Demographic hit, biometric hit, adjudication, ABIS failure and timeout</td></tr>
+<tr><td>Validation failures</td><td>NIN-020 to 029</td><td>Upload without sync, hash mismatch, inactive centre, schema violation</td></tr>
+<tr><td>Other registration types</td><td>NIN-040 to 043</td><td>Update, lost NIN, resident update, deactivation</td></tr>
+<tr><td>Using the NIN</td><td>NIN-050 to 056</td><td>Demographic, biometric and OTP authentication; revoked VID; credential</td></tr>
+<tr><td>Resilience</td><td>NIN-070 to 075</td><td>Broker restart, key service down, UIN pool exhausted, SMTP down</td></tr>
+<tr><td>Multi-site</td><td>NIN-080 to 083</td><td>Run on DC2, failover mid-flow, replication, mis-stamped collector</td></tr>
+<tr><td>Evidence negatives</td><td>NIN-090 to 093</td><td>Collector down, audit missing, logs disabled, sampling misconfigured</td></tr>
+</table>
+<h2>8.5 Scenario NIN-001 — new adult, no deduplication hit</h2>
+<h3>8.5.1 Preconditions and data</h3>
+<ul>
+<li>Prerequisites <code>env-nin-baseline</code>: environment resolved from the environment manager; masterdata (centre 10001, machine 10001, operator 110001) active; keys valid; partners and ABIS mock in NO_HIT mode; UIN pool ≥ [1 000]; observability canary retrievable.</li>
+<li>Persona <code>adult-nohit</code>: adult 18–80, all demographic fields per ID schema, POA and POI documents, 10 fingers, 2 irises, face (ISO 19794, quality ≥ 80), deterministic seed, unique.</li>
+</ul>
+<h3>8.5.2 Interaction sequence</h3>
+<table>
+<tr><th style="width:8%">Step</th><th style="width:26%">From → To</th><th>Message (MOSIP 1.2.x)</th></tr>
+<tr><td>A1</td><td>Jarvis</td><td>ROOT span "NIN-001 New adult registration no hit"; baggage cicd.pipeline.run.id, test.case.name</td></tr>
+<tr><td>A2</td><td>Jarvis → AuthManager</td><td>POST /v1/authmanager/authenticate/clientidsecretkey → 200, token</td></tr>
+<tr><td>A3</td><td>Jarvis → Masterdata</td><td>GET /v1/syncdata/latestidschema → ID schema version</td></tr>
+<tr><td>B1</td><td>Jarvis → Registration status</td><td>POST /registrationprocessor/v1/registrationstatus/sync → SUCCESS</td></tr>
+<tr><td>B3</td><td>Jarvis → Packet receiver</td><td>POST /registrationprocessor/v1/packetreceiver/registrationpackets → RECEIVED</td></tr>
+<tr><td>B6</td><td>Packet receiver → Kafka</td><td>MessageDTO {rid, reg_type NEW} with trace context</td></tr>
+<tr><td>C1–C8</td><td>Stages</td><td>Uploader, validator, classifier, CMD/operator validation, demographic and biometric deduplication (ABIS IDENTIFY → 0 candidates)</td></tr>
+<tr><td>D1</td><td>UIN generator → ID generator</td><td>GET /v1/idgenerator/uin → uin</td></tr>
+<tr><td>D2</td><td>UIN generator → ID repository</td><td>POST /idrepository/v1/identity/ → ACTIVATED</td></tr>
+<tr><td>D4</td><td>→ ID repository</td><td>POST /idrepository/v1/vid → perpetual VID</td></tr>
+<tr><td>E1–E5</td><td>Credential, WebSub, IDA</td><td>Credential request, CREDENTIAL_ISSUED event, IDA identity cache</td></tr>
+<tr><td>E7</td><td>Message sender → Notifier</td><td>POST /v1/notifier/email/send, /sms/send</td></tr>
+<tr><td>F1–F3</td><td>Jarvis</td><td>Status search → PROCESSED; identity read; demographic authentication with VID → authStatus true</td></tr>
+</table>
+<h3>8.5.3 Expected signals (extract)</h3>
+<table>
+<tr><th style="width:12%">Step</th><th style="width:32%">Span</th><th style="width:20%">Log</th><th style="width:18%">Metric</th><th>Audit</th></tr>
+<tr><td>Upload</td><td>SERVER POST …/registrationpackets, mosip.rid; DB insert; Kafka publish</td><td>INFO packet received, RID</td><td>Request count +1</td><td>Packet receiver event</td></tr>
+<tr><td>Dedup</td><td>JMS producer and consumer, IDENTIFY</td><td>INFO 0 candidates</td><td>ABIS round-trip</td><td>Dedup events</td></tr>
+<tr><td>NIN</td><td>SERVER GET /v1/idgenerator/uin</td><td>INFO UIN assigned (masked)</td><td>UIN pool level</td><td>UIN generator event</td></tr>
+<tr><td>Identity</td><td>SERVER POST /idrepository/v1/identity/; encrypt; insert</td><td>INFO identity created</td><td>Latency, DB pool</td><td>Create identity event</td></tr>
+<tr><td>Notify</td><td>CLIENT POST /v1/notifier/email/send</td><td>INFO notification sent</td><td>Sent counter</td><td>Notification event</td></tr>
+</table>
+<h3>8.5.4 Oracle extract</h3>
+<pre>- alias: IDGEN_GET_SERVER
+  resource: { service.name: idgenerator, acme.site.name: ${env.site} }
+  name: {$re: "^GET (/v1/idgenerator)?/uin$"}
+  kind: 2                       # SERVER
+  parent: UINGEN_GET_UIN_CLIENT
+  attributes:
+    http.response.status_code: 200
+    mosip.rid: {$ref: rid}
+  duration_ms: {$lte: 500}</pre>
+<p>Full oracle: <code>oracles/NIN-001.oracle.yaml</code>; OTLP example: <code>oracles/examples/NIN-001.otlp-example.json</code>; feature: <code>features/nin_001_new_adult_no_hit.feature</code>.</p>
+<h3>8.5.5 Evidence and verdict</h3>
+<p>Expected verdict PASS with signal-contract coverage 100 %, upload-to-PROCESSED within the agreed limit, no ERROR span or log, no PII in clear, audit multiset identical in database and audit tenant.</p>
+<h2>8.6 Further journeys on the same NIN</h2>
+<p>Filtering on <code>mosip.uin_hash</code> returns every journey of one identity: issuance (NIN-001), third-party authentication by a relying party (NIN-050/051, IDA with Keymanager and identity cache) and resident self-service update (NIN-042, resident service, OTP validation, update packet, ID repository update). Each is a separate trace; the journey view is assembled by query.</p>
+
+<h1>9 Security and privacy design</h1>
+<h2>9.1 Threats considered</h2>
+<table>
+<tr><th style="width:34%">Threat</th><th>Control</th></tr>
+<tr><td>PII leakage through spans, logs or metrics</td><td>Deny-list at source and gateway; continuous PII scan; hashing of identifiers (OAEF-SEC-01/02)</td></tr>
+<tr><td>Re-identification through NIN search</td><td>Restricted hashing helper; every lookup audited (OAEF-SEC-02)</td></tr>
+<tr><td>Unauthorised access to audit trail</td><td>SSO and RBAC; audit tenant restricted to auditors (OAEF-SEC-03)</td></tr>
+<tr><td>Tampering with evidence or audit</td><td>Hashes, signature, object lock (OAEF-SEC-06)</td></tr>
+<tr><td>Context injection from outside</td><td>Inbound context only from authorised partners; baggage size limit (OAEF-SEC-05)</td></tr>
+<tr><td>Compromised images or agents</td><td>Signed images, SBOM, admission policy (OAEF-SEC-08)</td></tr>
+<tr><td>Disclosure through public repositories</td><td>Classification and pre-publication scan (OAEF-SEC-09)</td></tr>
+</table>
+<h2>9.2 Compliance</h2>
+<p>Only synthetic data is used outside production; a DPIA covers the observability platform; retention limits are enforced by configuration [R8].</p>
+
+<h1>10 Operations</h1>
+<ul>
+<li>Pipeline health objectives: zero refused or failed exports at nominal load, ingestion lag below [30 s], canary freshness below [60 s]; any breach marks runs INCONCLUSIVE.</li>
+<li>Provisioned dashboards: platform health, journey per run, stage RED metrics, audit completeness, PII scan, DR.</li>
+<li>Governance: owners for the attribute registry, oracles, golden-run approval and the platform; change advisory for agent and convention upgrades.</li>
+<li>Runbooks and on-call support during qualification campaigns; onboarding of work-package teams.</li>
+</ul>
+
+<h1>11 Verification and traceability</h1>
+<p>Every requirement of chapter 5 is verified by test cases of the Validation Test Specification [R9]. The matrix below gives the primary test case per requirement.</p>
+<!--RTM-->
+
+<h1>12 Open issues and decisions</h1>
+<table>
+<tr><th style="width:8%">ID</th><th>Decision required</th></tr>
+<tr><td>D1</td><td>Environment configuration manager product and record ownership.</td></tr>
+<tr><td>D2</td><td>Tenant model: shared stack with tenants per platform class (proposed) or one stack per platform.</td></tr>
+<tr><td>D3</td><td>Handling of MOSIP code changes not achievable by extension (audit trace id, credential traceparent, packet traceparent).</td></tr>
+<tr><td>D4</td><td>ABIS vendor propagation of trace context, or span link boundary.</td></tr>
+<tr><td>D5</td><td>Organisation attribute namespace replacing acme.*.</td></tr>
+<tr><td>D6</td><td>Retention, capacity and threshold values (all bracketed values).</td></tr>
+<tr><td>D7</td><td>Publication status of the specification repository.</td></tr>
+</table>
+
+<h1>Annex A — Repository index</h1>
+<table>
+<tr><th style="width:42%">Path</th><th>Content</th></tr>
+<tr><td>models/</td><td>Use case and activity (PlantUML); requirement register</td></tr>
+<tr><td>catalog/TC-NIN-scenarios.md</td><td>Scenario catalogue</td></tr>
+<tr><td>features/</td><td>Gherkin scenarios</td></tr>
+<tr><td>oracles/</td><td>Oracles and OTLP examples</td></tr>
+<tr><td>data/personas/</td><td>Persona data contracts</td></tr>
+<tr><td>prerequisites/</td><td>Environment prerequisites</td></tr>
+<tr><td>observability/</td><td>Attribute model, injection and backend configuration</td></tr>
+<tr><td>docs/diagrams/</td><td>draw.io: architecture, E2E flow, NIN sequence, expected signals, evidence and verdict, observability and audit flow</td></tr>
+<tr><td>docs/wp0-shared-platform-requirements.md</td><td>WP0 requirements (source of chapter 5)</td></tr>
+</table>
+</body></html>
