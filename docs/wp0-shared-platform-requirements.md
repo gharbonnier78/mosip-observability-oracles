@@ -36,7 +36,9 @@ All platforms are registered in the **environment configuration manager** (COTS)
 | INST-05 | Offline registration station breaks the trace at sync | WP0-SW-08 |
 | INST-06 | Web / mobile front ends do not start or propagate traces | WP0-SW-09 |
 | INST-07 | Third-party partner calls (bank, telco, ABIS vendor) are opaque | WP0-SW-10, WP0-SEC-05 |
-| VER-01 | DB columns, stage codes, API paths vary between MOSIP patches | WP0-SW-14, WP0-TST-04 |
+| INST-08 | No business-level timeline: log checks rely on free-text bodies (`body: {$re: ".*${rid}.*"}`) and the RID → NIN duration (NF-04) spans traces T1, T2, T3 | WP0-SW-12, WP0-SW-04 |
+| INST-09 | A span over budget shows *where* time is lost, not *which code* consumes it | WP0-SW-13 |
+| VER-01 | DB columns, stage codes, API paths vary between MOSIP patches | WP0-SW-11, WP0-TST-04 |
 | VER-02 | Span names and attributes vary with agent version and semconv | WP0-SW-01, WP0-DQ-01 |
 | ENV-01 | Shared platform traffic makes metric deltas inexact | WP0-INF-09 |
 
@@ -59,6 +61,8 @@ Principle: **extend, don't fork.** Prefer the OpenTelemetry Java agent, its exte
 | WP0-SW-09 | **Web and mobile front ends** (resident portal, admin portal, mobile apps): OTel browser / mobile SDK, user-action spans, `traceparent` on every API call (CORS allows `traceparent`, `tracestate`, `baggage`), consent-aware, no PII in attributes. | S | A resident-portal update journey (NIN-042) shows the browser span as root of the backend trace. | INST-06 |
 | WP0-SW-10 | **Partner and gateway edge**: the ingress / API gateway creates a server span for every partner call, records `mosip.partner_id` and accepts an inbound `traceparent` from authorised partners only (remote parent); partner simulators in INT are instrumented. | S | Bank-auth scenario (NIN-050/051) shows partner id and remote parent on the first IDA span. | INST-07 |
 | WP0-SW-11 | **Version and build manifest**: each service exposes build info (version, git commit, image digest) via actuator and resource attributes `service.version`, `vcs.ref.head.revision`. | M | Evidence manifest lists every component's version and digest for each run. | VER-01 |
+| WP0-SW-12 | **Business events** (OTel *Events*: log records with `event.name` and typed attributes): each business step emits one event from a **versioned event catalogue** kept in the attribute registry (`observability/attribute-model.md` §2.3): `mosip.registration.packet.received`, `mosip.registration.stage.completed`, `mosip.identity.uin.assigned`, `mosip.identity.activated`, `mosip.credential.issued`, `mosip.notification.sent`. Emitted **inside the producing span** (`trace_id`, `span_id`), carrying `mosip.rid` / `mosip.uin_hash`, **never PII**. Audit events (WP0-SW-05) follow the same catalogue. | M | For NIN-001 the oracle section `events` passes: catalogue events in order, each joined to its producing span by id; the RID → NIN duration is computed from events across T1, T2, T3. | INST-08 |
+| WP0-SW-13 | **Continuous profiling** on PERF (optional on TEST): OTel *Profiles* signal or a profiler with span correlation (`span_id` on samples, e.g. async-profiler / eBPF profiler → Pyroscope); when a span exceeds its budget (`nfr.span_budgets_ms`) the evidence collector attaches the profile of that service and window. The Profiles signal is not yet stable: profiles **inform** the report, they never decide a verdict. | S | A span over budget in a PERF run links to a CPU profile of the same service and window; the top frames are in the evidence bundle. | INST-09 |
 
 ## 4. Test tooling requirements (shared by all work packages)
 
@@ -128,9 +132,9 @@ Principle: **extend, don't fork.** Prefer the OpenTelemetry Java agent, its exte
 | Phase | Content | Exit criterion |
 |---|---|---|
 | **WP0.1 Foundation** | INF-01…08, SEC-03/04, DQ-01, OPS-01 | Canary from every site and platform; drift check green |
-| **WP0.2 Instrumentation** | SW-01…07, SW-11, SEC-01/02, DQ-02/03 | NIN-001 signal contract ≥ [95 %] on TEST |
+| **WP0.2 Instrumentation** | SW-01…07, SW-11, SW-12, SEC-01/02, DQ-02/03 | NIN-001 signal contract ≥ [95 %] on TEST, event sequence complete |
 | **WP0.3 Test tooling** | TST-01…07, SEC-06 | NIN-001 PASS with sealed, replayable evidence |
-| **WP0.4 Edges and multi-site** | SW-08…10, SEC-05, INF-09…11, DR scenarios | Offline station, bank auth and DR scenarios (NIN-080…082) pass |
+| **WP0.4 Edges and multi-site** | SW-08…10, SW-13, SEC-05, INF-09…11, DR scenarios | Offline station, bank auth and DR scenarios (NIN-080…082) pass; profile attached to an over-budget span on PERF |
 
 Dependency for other work packages: **passing the signal contract (WP0-DQ-02) is part of each delivery's Definition of Done** from WP0.2 onward.
 
@@ -144,3 +148,5 @@ Resolved on 2026-10-18: site attribute = `cloud.region` (`dc1`, `dc2`), DR role 
 4. ABIS vendor: can it propagate `traceparent` through its queues, or is the boundary a span link only?
 5. Retention durations and capacity figures (all bracketed values).
 6. Whether this repository stays public (see WP0-SEC-09).
+7. Event catalogue (WP0-SW-12): owner, and whether MOSIP audit events are emitted as catalogue events by the audit client (one source) or mapped by the collector from the audit stream.
+8. Profiling (WP0-SW-13): tool (OTel Profiles with eBPF profiler, or async-profiler → Pyroscope), and whether a performance verdict class is added once the Profiles signal is stable.

@@ -19,8 +19,8 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:30%">Field</th><th>Value</th></tr>
 <tr><td>Document identifier</td><td>OAEF-SPEC-001</td></tr>
-<tr><td>Version</td><td>0.2 — Draft for review</td></tr>
-<tr><td>Date</td><td>2026-10-18</td></tr>
+<tr><td>Version</td><td>0.3 — Draft for review</td></tr>
+<tr><td>Date</td><td>2026-10-19</td></tr>
 <tr><td>Work package</td><td>WP0 — Shared observability, audit and evidence layer</td></tr>
 <tr><td>Owner</td><td>[Name, role]</td></tr>
 <tr><td>Classification</td><td>[To be set by the document owner]</td></tr>
@@ -32,6 +32,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
 <tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft: generic layer, IaC deployment, qualification layer, MOSIP NIN reference implementation.</td></tr>
 <tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2); DR role oaef.site.role; namespace oaef.* (former open decision D5 resolved).</td></tr>
+<tr><td>0.3</td><td>2026-10-19</td><td>[Author]</td><td>Business events (OAEF-SW-12) and continuous profiling (OAEF-SW-13); span links and events in the oracle language; gaps INST-08, INST-09; decisions D7, D8.</td></tr>
 </table>
 <h4>Approvals</h4>
 <table>
@@ -220,7 +221,9 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><th style="width:30%">Key</th><th style="width:28%">Links</th><th style="width:24%">Survives</th><th>Convention</th></tr>
 <tr><td>trace_id, span_id</td><td>One causal chain</td><td>Synchronous calls, propagated messages</td><td>W3C Trace Context</td></tr>
 <tr><td>cicd.pipeline.run.id, test.case.name, test.suite.name</td><td>Test run and scenario</td><td>Every span of the journey (baggage)</td><td>OTel CICD and Test</td></tr>
+<tr><td>Span link (traceId, spanId of the origin)</td><td>Asynchronous continuation</td><td>Batch jobs, WebSub, ABIS queues</td><td>OTel span links</td></tr>
 <tr><td>mosip.rid, mosip.uin_hash, mosip.request_id</td><td>Business object lifecycle</td><td>New traces, batches, audit, database rows</td><td>Domain namespace</td></tr>
+<tr><td>event.name (business event catalogue)</td><td>Business timeline of one RID or NIN</td><td>All traces of the journey; durations between steps</td><td>OTel Events, domain catalogue</td></tr>
 <tr><td>Actor ids (operator, device, user hash)</td><td>Human or technical actor</td><td>Sessions, channels, offline sync</td><td>Domain, hashed</td></tr>
 <tr><td>deployment.environment.name, k8s.cluster.name, cloud.region</td><td>Where it happened</td><td>Everything (resource)</td><td>OTel semantic conventions</td></tr>
 </table>
@@ -234,7 +237,9 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>Traces</td><td>OTLP over gRPC (4317) or HTTP (4318); JSON encoding: ids lowercase hex, 64-bit integers as strings, enums as integers</td><td>traceId, spanId, parentSpanId, name, kind, start/end time, status, resource attributes, required attributes</td></tr>
 <tr><td>Logs</td><td>OTLP logs (agent logback appender) or JSON stdout parsed by filelog receiver</td><td>time, severityNumber/Text, body, traceId, spanId, flags, business keys</td></tr>
 <tr><td>Metrics</td><td>OTLP metrics; Prometheus scraping for exporters</td><td>Standard names and units; exemplars with trace_id</td></tr>
-<tr><td>Audit</td><td>MOSIP audit API to audit database, plus OTLP log to the audit tenant</td><td>Audit fields (4.4) plus trace_id, span_id</td></tr>
+<tr><td>Events</td><td>OTLP log records with event.name (OTel Events), emitted inside the producing span</td><td>event.name from the catalogue, traceId, spanId, business keys; no personal data (OAEF-SW-12)</td></tr>
+<tr><td>Audit</td><td>MOSIP audit API to audit database, plus OTLP log to the audit tenant</td><td>Audit fields (4.4) plus trace_id, span_id; event name from the catalogue</td></tr>
+<tr><td>Profiles</td><td>OTel Profiles signal or profiler with span correlation; PERF platform (OAEF-SW-13)</td><td>Resource attributes, span_id on samples; informative evidence only</td></tr>
 </table>
 <p>Note: the Tempo JSON API returns trace and span ids in base64; consumers normalise to hex.</p>
 <h2>4.2 Attribute registry</h2>
@@ -248,6 +253,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><td>test.suite.name, test.case.name, test.case.result.status</td><td>span</td><td>TC-NIN, NIN-001, pass</td><td>Jarvis</td></tr>
 <tr><td>oaef.test.verdict, oaef.test.persona</td><td>ROOT span</td><td>PASS, adult-nohit</td><td>Jarvis</td></tr>
 <tr><td>mosip.rid, mosip.uin_hash, mosip.vid_hash, mosip.request_id, mosip.partner_id, mosip.reg_type, mosip.stage</td><td>span, log</td><td>29-digit RID; salted hash</td><td>MOSIP extension</td></tr>
+<tr><td>event.name</td><td>event (log)</td><td>mosip.registration.packet.received, mosip.identity.activated</td><td>Business event catalogue, versioned with the registry</td></tr>
 <tr><td>HTTP, database, messaging attributes</td><td>span</td><td>http.response.status_code, db.namespace, messaging.destination.name</td><td>Agent (semantic conventions)</td></tr>
 </table>
 <h2>4.3 Context propagation</h2>
@@ -276,14 +282,16 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
   signature.jws        signature of manifest.json
   traces/&lt;trace_id&gt;.json   OTLP JSON
   logs.ndjson          log records (app tenant)
+  events.ndjson        business events of the journey, all traces
   audit.json           audit DB rows and audit-tenant records
+  profiles/            profiles of spans over budget (optional, informative)
   metrics.json         values at t0 and t_end, exemplars
   business.json        API responses and database states
   context.json         infrastructure and pipeline health in the window
   verdict.json         check results, coverage, verdict class, first source
   links.md             Grafana deep links</pre>
 <h2>4.6 Oracle definition language</h2>
-<p>An oracle is a YAML document with sections <code>metadata, settle, rules, api, db, notification, traces, logs, metrics, audit, nfr, verdict</code>. Matchers: literal (typed equality), <code>$re</code>, <code>$cap</code>, <code>$ref</code>, <code>$in</code>, <code>$gte</code>, <code>$lte</code>, <code>$exists</code>, <code>$golden</code>; span relations <code>parent</code>, <code>parent_ancestor</code>, <code>parent_kind</code>, <code>after</code>, <code>count</code>; collection checks <code>ordered_subsequence</code>. Values defined by a standard are explicit; deployment-specific values are frozen from the golden run. The schema of each file type is validated in CI (OAEF-TST-03).</p>
+<p>An oracle is a YAML document with sections <code>metadata, settle, rules, api, db, notification, traces (with links), logs, events, metrics, audit, nfr, verdict</code>. Matchers: literal (typed equality), <code>$re</code>, <code>$cap</code>, <code>$ref</code>, <code>$in</code>, <code>$gte</code>, <code>$lte</code>, <code>$exists</code>, <code>$golden</code>; span relations <code>parent</code>, <code>parent_ancestor</code>, <code>parent_kind</code>, <code>after</code>, <code>count</code>, <code>link_to</code>, <code>link_to_trace</code>; record-to-span relation <code>span_of</code>; collection checks <code>ordered_subsequence</code>; event <code>durations</code> across traces. Values defined by a standard are explicit; deployment-specific values are frozen from the golden run. The schema of each file type is validated in CI (OAEF-TST-03).</p>
 <h2>4.7 External interfaces</h2>
 <table>
 <tr><th style="width:28%">Interface</th><th style="width:36%">Endpoint (reference)</th><th>Used by</th></tr>
@@ -431,7 +439,7 @@ exporters:
 <tr><td>PRODUCT BUG</td><td>Error span with exception, infrastructure clean</td><td>Development</td></tr>
 </table>
 <h2>7.5 Reporting and investigation</h2>
-<p>The report lists, per contractual clause, the expected value, the actual value and the evidence file; it gives the probable first source and a Grafana deep link scoped to trace, time window, environment and site. Root-cause analysis then proceeds from the evidence to the relevant code: service code, test code, infrastructure as code, gateway and WAF rules, reference data, or observability configuration.</p>
+<p>The report lists, per contractual clause, the expected value, the actual value and the evidence file; it gives the probable first source and a Grafana deep link scoped to trace, time window, environment and site. When a span exceeds its budget and a profile is available (OAEF-SW-13), the report adds the top frames of that profile; profiles never change the verdict class. Root-cause analysis then proceeds from the evidence to the relevant code: service code, test code, infrastructure as code, gateway and WAF rules, reference data, or observability configuration.</p>
 <h2>7.6 Golden-run governance</h2>
 <p>A golden run is recorded on a validated platform, reviewed by a functional owner and an observability owner, approved by pull request, and frozen into the oracle. It is re-recorded on any platform release that changes agent, semantic conventions or MOSIP version.</p>
 
@@ -562,6 +570,8 @@ exporters:
 <tr><td>D4</td><td>ABIS vendor propagation of trace context, or span link boundary.</td></tr>
 <tr><td>D5</td><td>Retention, capacity and threshold values (all bracketed values).</td></tr>
 <tr><td>D6</td><td>Publication status of the specification repository.</td></tr>
+<tr><td>D7</td><td>Owner of the business event catalogue; audit events emitted as catalogue events by the audit client, or mapped by the collector from the audit stream.</td></tr>
+<tr><td>D8</td><td>Profiling tool (OTel Profiles with eBPF profiler, or async-profiler to Pyroscope) and whether a performance verdict class is added once the Profiles signal is stable.</td></tr>
 </table>
 
 <h1>Annex A — Repository index</h1>

@@ -57,6 +57,25 @@ Semconv naming rules: custom attributes must live in a namespace you own. **Deci
 | `oaef.test.persona` | ROOT span | `adult-nohit` | Jarvis |
 | `mosip.rid` | span + log | 29-digit RID | INST-01 extension |
 
+### 2.3 Business event catalogue (WP0-SW-12)
+
+OTel **Events** are log records with an `event.name` and typed attributes; they give the oracle a business timeline that does not depend on free-text log bodies. Rules: emitted **inside the producing span** (so `trace_id` / `span_id` are set), severity INFO, business keys only (`mosip.rid`, `mosip.uin_hash`), **never the UIN, VID or other PII**. The catalogue is versioned with this registry; CI lint rejects an unknown `event.name` (WP0-DQ-01).
+
+| `event.name` | Emitted by (span) | Step | Attributes |
+|---|---|---|---|
+| `mosip.registration.packet.received` | regproc-pkr (`PKR_SERVER`) | B3 | `mosip.rid`, `mosip.reg_type` |
+| `mosip.registration.stage.completed` | regproc stage (`STAGE_PROCESS`) | C1–C8 | `mosip.rid`, `mosip.stage`, `mosip.stage.status` (`SUCCESS`, `FAILED`, `REPROCESS`) |
+| `mosip.identity.uin.assigned` | UIN generator stage | D1 | `mosip.rid` |
+| `mosip.identity.activated` | idrepo-identity (`IDREPO_CREATE_SERVER`) | D2 | `mosip.rid`, `mosip.uin_hash` |
+| `mosip.credential.issued` | credential batch job (trace T2) | E1–E5 | `mosip.uin_hash`, `mosip.request_id` |
+| `mosip.notification.sent` | message sender | E7 | `mosip.rid`, `mosip.notification.channel` (`email`, `sms`) |
+
+Audit events (WP0-SW-05) reuse these names, so one audit row ↔ one event ↔ one span. Durations between events give the business KPIs across traces (NF-04 RID → NIN, NF-05 notification delay).
+
+### 2.4 Profiles (WP0-SW-13)
+
+*Profiles* is the OTel profiling signal (CPU / memory samples per stack frame); it is not yet stable. Profiles carry the same resource attributes as the other signals (env, site, service) and `span_id` on samples, so the profile of a slow span can be opened from the trace. In OAEF they are **informative evidence** attached to the report when a span exceeds its budget; they never decide a verdict.
+
 ## 3. Flow of values: environment configuration manager → telemetry
 
 ```

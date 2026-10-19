@@ -112,8 +112,19 @@ notification:
 traces:
   trace_set:
     T1: { root: ROOT }                                  # Jarvis + regproc + idgenerator + idrepo (HTTP + Kafka propagation)
-    T2: { locate_by: "log attribute requestId from idrepo-identity -> trace_id", note: "credential request batch job starts a NEW trace (scheduled job, no parent)" }
-    T3: { locate_by: "span attr in ida-internal callback, or log correlation on credential id", note: "WebSub delivery starts a NEW trace" }
+    T2: { locate_by: "span link to IDREPO_CREATE_SERVER (WP0-SW-04); fallback before SW-04: log attribute requestId from idrepo-identity -> trace_id", note: "credential request batch job starts a NEW trace (scheduled job, no parent)" }
+    T3: { locate_by: "span link to the WebSub publisher span (WP0-SW-04); fallback: log correlation on credential id", note: "WebSub delivery starts a NEW trace" }
+  links:                              # WP0-SW-04: asynchronous breaks are joined by span links, not by heuristics
+    - alias: LINK_CREDENTIAL_BATCH
+      trace: T2
+      span: { kind: {$in: [1, 5]}, parentSpanId: "" }    # first span of the batch job trace
+      link_to: IDREPO_CREATE_SERVER                       # links[].traceId == trace.root and links[].spanId == IDREPO_CREATE_SERVER.spanId
+      attributes: { mosip.rid: {$ref: rid}, test.case.name: "NIN-001" }   # restored from the stored context (no baggage after the break)
+    - alias: LINK_WEBSUB_DELIVERY
+      trace: T3
+      span: { kind: 2, parentSpanId: "" }                 # ida-internal callback server span
+      link_to_trace: T2                                   # publisher span of the CREDENTIAL_ISSUED event
+      attributes: { mosip.uin_hash: {$ref: uin_hash} }
   common_span_rules:
     every_span:
       traceId: {$re: "^[0-9a-f]{32}$"}
@@ -368,6 +379,36 @@ logs:
   pii_allow_list: [{ service.name: "notifier", fields: [resident.email] }]
 
 # ---------------------------------------------------------------------------
+# 3b. EVENTS — business events (OTel Events = LogRecord with event.name), catalogue in
+#     observability/attribute-model.md §2.3 (WP0-SW-12). Replaces body regexes as the business timeline.
+# ---------------------------------------------------------------------------
+events:
+  query:
+    tenant: app
+    logql: '{deployment_environment_name="${env.name}", cloud_region="${env.site}"} | event_name=~"mosip\\..+" | mosip_rid="${rid}" or mosip_uin_hash="${uin_hash}"'
+  catalogue_version: {$golden: true}  # contract check: every eventName exists in this catalogue version
+  every_event:
+    eventName: {$re: "^mosip\\.[a-z_.]+$"}
+    traceId: {$re: "^[0-9a-f]{32}$"}
+    spanId: {$re: "^[0-9a-f]{16}$"}                   # joined to its producing span by id (no time heuristic)
+    severityNumber: 9
+    forbidden_attribute_values: ["${uin}", "${vid}", "${resident.phone}", "${resident.email}"]
+  expected_ordered_subsequence:
+    - { alias: EV_PACKET_RECEIVED, eventName: "mosip.registration.packet.received", trace: T1, span_of: PKR_SERVER, attributes: { mosip.rid: {$ref: rid}, mosip.reg_type: "NEW" } }
+    - { alias: EV_STAGE_COMPLETED, eventName: "mosip.registration.stage.completed", trace: T1, attributes: { mosip.rid: {$ref: rid}, mosip.stage: {$exists: true}, mosip.stage.status: "SUCCESS" }, count: {$gte: 8} }
+    - { alias: EV_UIN_ASSIGNED, eventName: "mosip.identity.uin.assigned", trace: T1, attributes: { mosip.rid: {$ref: rid} } }   # never the UIN itself
+    - { alias: EV_IDENTITY_ACTIVATED, eventName: "mosip.identity.activated", trace: T1, span_of: IDREPO_CREATE_SERVER, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
+    - { alias: EV_CREDENTIAL_ISSUED, eventName: "mosip.credential.issued", trace: T2, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
+    - { alias: EV_NOTIFICATION_SENT, eventName: "mosip.notification.sent", attributes: { mosip.rid: {$ref: rid}, mosip.notification.channel: {$in: [email, sms]} }, count: {$gte: 1} }
+  stage_sequence: "mosip.stage values of EV_STAGE_COMPLETED == db.regprc_transactions.ordered_subsequence minus PACKET_RECEIVER"
+  durations:                          # business KPIs from event timestamps, across traces T1..T3
+    - { id: NF-04, from: EV_PACKET_RECEIVED, to: EV_IDENTITY_ACTIVATED, expect_s: {$lte: 86400} }   # [24] h [A]
+    - { id: NF-05, from: EV_IDENTITY_ACTIVATED, to: EV_NOTIFICATION_SENT, expect_s: {$lte: 900} }  # [15] min [A]
+  forbidden:
+    - "eventName == mosip.registration.stage.completed with mosip.stage.status != SUCCESS"
+  audit_alignment: "every audit row (section 5) has one catalogue event with the same trace_id and span_id (WP0-SW-05)"
+
+# ---------------------------------------------------------------------------
 # 4. METRICS — OTLP metrics (exported by agent) and spanmetrics (collector), checked in Mimir as deltas
 #    OTLP -> Mimir naming: http.server.request.duration (unit s) => http_server_request_duration_seconds_{bucket,count,sum}
 #    resource service.name => label job (no service.namespace set), service.instance.id => instance
@@ -457,7 +498,8 @@ nfr:
 # ---------------------------------------------------------------------------
 verdict:
   functional_checks: [rules, api, db, notification, "feature Then-steps"]
-  signal_contract: [traces.spans, logs.expected, metrics.assertions, audit]
+  signal_contract: [traces.spans, traces.links, logs.expected, events, metrics.assertions, audit]
+  informative_only: [profiles]        # WP0-SW-13: attached to the report when a span exceeds nfr.span_budgets_ms; never changes the class
   classes:
     PASS: "functional OK and signal_contract 100 %"
     PASS_OBSERVABILITY_DEFECT: "functional OK and signal_contract < 100 %"

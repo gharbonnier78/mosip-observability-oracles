@@ -70,6 +70,9 @@ The engine converts every OTLP `KeyValue[]` into a map, normalises IDs to lowerc
 | `after: ALIAS` | `startTimeUnixNano >= ALIAS.endTimeUnixNano - 50 ms` |
 | `count: {...}` | number of spans/records matching the template |
 | `ordered_subsequence` | expected items appear in this order (other items allowed between) |
+| `link_to: ALIAS` / `link_to_trace: Tn` | the span holds a span link to ALIAS (same `traceId` and `spanId`) or to a span of trace Tn |
+| `span_of: ALIAS` | a log record or event was emitted inside ALIAS (its `spanId` is ALIAS or a descendant) |
+| `durations` | elapsed time between two matched events (`expect_s`), across traces |
 
 Each check produces `{check_id, status: pass|fail|error, expected, actual, evidence_ref}` in `verdict.json`; the signal-contract coverage = passed signal checks / total signal checks.
 
@@ -85,3 +88,5 @@ The implementation requirements that close these gaps (software, infrastructure,
 | VER-01 | Exact column names, stage codes, ID Repo RID lookup (`idvid/{rid}?idType=RID`) differ between 1.2.0.x patches | false fails | verify against `db_scripts` + Swagger of the deployed version, then freeze via golden run |
 | VER-02 | Span names / messaging attributes change with the Java agent version and semconv opt-in | false fails | pin agent version; regex matchers already tolerate route/context-path variants |
 | ENV-01 | Shared environment: other traffic changes metric deltas | metric asserts use `$gte`, not exact | dedicated namespace per run gives exact deltas |
+| INST-08 | No business events: log checks use free-text body regexes; RID → NIN duration spans 3 traces | fragile log checks, NF-04 not measurable | business event catalogue (`observability/attribute-model.md` §2.3), oracle section `events` |
+| INST-09 | A span over budget does not say which code consumes the time | slow runs need manual profiling | continuous profiling on PERF, profile attached to the report (informative only) |

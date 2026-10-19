@@ -18,8 +18,8 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:30%">Field</th><th>Value</th></tr>
 <tr><td>Document identifier</td><td>OAEF-VTS-001</td></tr>
-<tr><td>Version</td><td>0.2 — Draft for review</td></tr>
-<tr><td>Date</td><td>2026-10-18</td></tr>
+<tr><td>Version</td><td>0.3 — Draft for review</td></tr>
+<tr><td>Date</td><td>2026-10-19</td></tr>
 <tr><td>Test basis</td><td>OAEF-SPEC-001 — Observability and Audit Evidence Framework Specification</td></tr>
 <tr><td>Owner</td><td>[Name, role]</td></tr>
 <tr><td>Classification</td><td>[To be set by the document owner]</td></tr>
@@ -29,6 +29,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <tr><th style="width:12%">Version</th><th style="width:16%">Date</th><th style="width:22%">Author</th><th>Change</th></tr>
 <tr><td>0.1</td><td>2026-10-18</td><td>[Author]</td><td>First complete draft.</td></tr>
 <tr><td>0.2</td><td>2026-10-18</td><td>[Author]</td><td>Site attribute: cloud.region (dc1, dc2).</td></tr>
+<tr><td>0.3</td><td>2026-10-19</td><td>[Author]</td><td>Test cases VT-PIPE-07, VT-SW-10, VT-SW-11; test data D6 (business events).</td></tr>
 </table>
 <h4>Approvals</h4>
 <table>
@@ -109,8 +110,8 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <table>
 <tr><th style="width:16%">Feature set</th><th style="width:40%">Covers</th><th>Test cases</th></tr>
 <tr><td>FS-1 Infrastructure</td><td>Stack per site, WORM, tenancy, capacity, time, network, drift, GitOps, DR</td><td>VT-INF-01 to VT-INF-10</td></tr>
-<tr><td>FS-2 Pipeline</td><td>Ingestion, sampling, redaction, routing, derived metrics, health</td><td>VT-PIPE-01 to VT-PIPE-06</td></tr>
-<tr><td>FS-3 Instrumentation</td><td>Agent, keys, propagation, links, audit correlation, metrics, edges</td><td>VT-SW-01 to VT-SW-09</td></tr>
+<tr><td>FS-2 Pipeline</td><td>Ingestion, sampling, redaction, routing, derived metrics, health, business events</td><td>VT-PIPE-01 to VT-PIPE-07</td></tr>
+<tr><td>FS-3 Instrumentation</td><td>Agent, keys, propagation, links, audit correlation, metrics, edges, business events, profiling</td><td>VT-SW-01 to VT-SW-11</td></tr>
 <tr><td>FS-4 Security</td><td>PII, lookup, access, transport, baggage, integrity, compliance, supply chain, publication</td><td>VT-SEC-01 to VT-SEC-09</td></tr>
 <tr><td>FS-5 Data quality</td><td>Registry, contract, cardinality</td><td>VT-DQ-01 to VT-DQ-03</td></tr>
 <tr><td>FS-6 Qualification layer</td><td>Root span, evidence, oracle, release awareness, data, mocks, reports, verdicts</td><td>VT-QUAL-01 to VT-QUAL-08</td></tr>
@@ -134,6 +135,7 @@ code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt; }
 <li><b>D3 — Fault data sets</b>: variants of D1 for verdict classification: missing span; error span with exception event; Kubernetes restart event in the window; business rejection code; wrong outcome without error signal; pipeline breach.</li>
 <li><b>D4 — PII seeds</b>: fake 11-digit NIN, fake email and phone, never real values.</li>
 <li><b>D5 — Persona adult-nohit</b> for full mode.</li>
+<li><b>D6 — NIN-001 business events</b>: the six catalogue events of OAEF-SW-12 as OTLP log records with event.name, attached to the spans of D1 (same trace_id and span_id).</li>
 </ul>
 
 <h1>5 Test procedures</h1>
