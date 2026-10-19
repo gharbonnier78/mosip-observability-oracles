@@ -50,8 +50,14 @@ The script prints the **replayed trace id** and the **packet-receiver span id**.
 
 1. **Trace** — Explore → Tempo → query the trace id. Expected: 7 spans, root `NIN-001 New adult registration no hit` (service `jarvis-e2e`) → step → `POST` client → `POST /registrationprocessor/v1/packetreceiver/registrationpackets` (service `regproc-pkr`) → `INSERT mosip_regprc.registration` and `packet-receiver-bus-out publish` → `packet-receiver-bus-out process` (service `regproc-group1`). Show resource attributes `cloud.region=dc1`, `deployment.environment.name=test-int`, span attributes `test.case.name`, `mosip.rid`.
 2. **Log** — from the packet-receiver span, *Logs for this span* (or Explore → Loki: `{service_name="regproc-pkr"} | trace_id="<trace id>"`). Expected: one INFO record with the RID in the body.
-3. **Metric and exemplar** — Explore → Prometheus/Mimir: `http_server_request_duration_seconds_bucket{service_name="regproc-pkr"}` (label may be `job="regproc-pkr"` depending on the backend) with *Exemplars* on. Expected: an exemplar whose trace id is the replayed one.
+3. **Metric and exemplar** — Explore → Prometheus/Mimir: `http_server_request_duration_seconds_bucket{service_name="regproc-pkr"}` (label may be `job="mosip/regproc-pkr"` depending on the backend) with *Exemplars* on. Expected: an exemplar whose trace id is the replayed one.
 4. **Oracle** — open `oracles/NIN-001.oracle.yaml` beside the trace; match `PKR_SERVER` (name, kind 2, parent = Jarvis client span, `http.response.status_code` 200, `mosip.rid`). Say clearly: the evidence collector and oracle engine are not built yet (WP0.3).
+
+## Automated check
+
+`bash validation/demo/check.sh` replays NIN-001 and verifies, through the Grafana API, that the trace has 7 spans, the packet-receiver log record exists and a metric exemplar points to the replayed trace. It ends with `RESULT: PASS`.
+
+Last rehearsal: 2026-10-19, GitHub Codespaces (universal:2 image), `grafana/otel-lgtm:latest` with Grafana 13.2.3 — **PASS** (traces, logs, metrics HTTP 200; 7 spans; 1 log record; exemplar → trace). Pin that image version for the session.
 
 ## Rehearsal checklist (day before)
 

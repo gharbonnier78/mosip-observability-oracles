@@ -411,16 +411,16 @@ events:
 # ---------------------------------------------------------------------------
 # 4. METRICS — OTLP metrics (exported by agent) and spanmetrics (collector), checked in Mimir as deltas
 #    OTLP -> Mimir naming: http.server.request.duration (unit s) => http_server_request_duration_seconds_{bucket,count,sum}
-#    resource service.name => label job (no service.namespace set), service.instance.id => instance
+#    resource service.namespace/service.name => label job (e.g. job="mosip/regproc-pkr"), service.instance.id => instance
 # ---------------------------------------------------------------------------
 metrics:
   baseline:                           # Jarvis snapshots these at t0 (Background) and t_end (after settle)
     - id: M1
-      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="regproc-pkr", http_route=~".*registrationpackets", http_request_method="POST", http_response_status_code="200"})'
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="mosip/regproc-pkr", http_route=~".*registrationpackets", http_request_method="POST", http_response_status_code="200"})'
     - id: M2
-      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="idgenerator", http_route=~".*/uin", http_request_method="GET", http_response_status_code="200"})'
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="mosip/idgenerator", http_route=~".*/uin", http_request_method="GET", http_response_status_code="200"})'
     - id: M3
-      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="idrepo-identity", http_request_method="POST", http_response_status_code="200"})'
+      promql: 'sum(http_server_request_duration_seconds_count{deployment_environment_name="${env.name}", cloud_region="${env.site}", job="mosip/idrepo-identity", http_request_method="POST", http_response_status_code="200"})'
     - id: M4
       promql: 'sum(traces_span_metrics_calls_total{deployment_environment_name="${env.name}", cloud_region="${env.site}", service_name="auditmanager", span_kind="SPAN_KIND_SERVER", status_code!="STATUS_CODE_ERROR"})'
     - id: M5
@@ -432,7 +432,7 @@ metrics:
     - { id: M4, delta: {$gte: 10} }   # ~1 audit per stage + pkr + idrepo
     - { id: M5, delta: 0 }
     - id: ENV1                        # env/site promotion works: series of this run are labelled with the target env and site
-      promql: 'count(http_server_request_duration_seconds_count{job="regproc-pkr", deployment_environment_name="${env.name}", cloud_region="${env.site}", k8s_cluster_name="${env.cluster}"})'
+      promql: 'count(http_server_request_duration_seconds_count{job="mosip/regproc-pkr", deployment_environment_name="${env.name}", cloud_region="${env.site}", k8s_cluster_name="${env.cluster}"})'
       expect: {$gte: 1}
     - id: ENV2                        # no leakage: this env's services never report another site's label
       promql: 'count(target_info{deployment_environment_name="${env.name}", service_namespace="mosip", cloud_region!="${env.site}"}) or vector(0)'

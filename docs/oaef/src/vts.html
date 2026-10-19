@@ -174,7 +174,7 @@ print('replayed trace id:', root)</pre>
 curl -s -G "$LOKI/loki/api/v1/query_range" -H "X-Scope-OrgID: app" \
      --data-urlencode 'query={service_name="regproc-pkr"} | trace_id="&lt;trace_id&gt;"'
 curl -s -G "$MIMIR/prometheus/api/v1/query_exemplars" \
-     --data-urlencode 'query=http_server_request_duration_seconds_bucket{job="regproc-pkr"}' \
+     --data-urlencode 'query=http_server_request_duration_seconds_bucket{job="mosip/regproc-pkr"}' \
      --data-urlencode "start=$(date -d '-10 min' +%s)" --data-urlencode "end=$(date +%s)"</pre>
 <h2>5.2 TP-2 Synthetic telemetry with telemetrygen</h2>
 <pre># traces: 100 test-tagged traces with 5 child spans, wrong site on purpose (stamping test)
