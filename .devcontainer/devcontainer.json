@@ -1,0 +1,18 @@
+{
+  "name": "OAEF live demo",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "containerEnv": { "GF_ADMIN_PASSWORD": "change-me" },
+  "postStartCommand": "docker compose -f validation/demo/docker-compose.yml up -d",
+  "forwardPorts": [3000, 4318],
+  "portsAttributes": {
+    "3000": { "label": "Grafana", "onAutoForward": "notify" },
+    "4318": { "label": "OTLP HTTP", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": { "extensions": ["redhat.vscode-yaml", "ms-python.python"] }
+  }
+}

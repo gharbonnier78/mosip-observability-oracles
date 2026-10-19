@@ -16,7 +16,7 @@ Slide numbers refer to the current 36-slide deck. Slides not shown stay availabl
 
 ## Demo script (simulation mode, no MOSIP needed)
 
-Prerequisite: observability stack reachable (DEV or TEST), Python 3, the repository checked out.
+Prerequisite: an observability stack reachable (local Docker, GitHub Codespaces, Grafana Cloud free tier, or the DEV platform), Python 3, the repository checked out. Setup, demo steps and rehearsal checklist: `validation/demo/README.md`.
 
 1. **Replay NIN-001** with fresh identifiers and timestamps:
    `python3 validation/replay_nin001.py oracles/examples/NIN-001.otlp-example.json http://<agent>:4318`

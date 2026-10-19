@@ -1,0 +1,15 @@
+# OAEF live demo stack: OpenTelemetry Collector + Tempo + Loki + Prometheus + Grafana in one container.
+# Image: grafana/otel-lgtm (demo / development use only, not for production).
+# Pin a version you have rehearsed with:  LGTM_VERSION=<tag> docker compose up -d
+services:
+  lgtm:
+    image: grafana/otel-lgtm:${LGTM_VERSION:-latest}
+    container_name: oaef-lgtm
+    ports:
+      - "127.0.0.1:3000:3000"   # Grafana        (bound to localhost; Codespaces forwards it privately)
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP      (used by validation/replay_nin001.py)
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-change-me}
+    restart: unless-stopped
