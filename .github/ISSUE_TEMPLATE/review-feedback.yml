@@ -1,0 +1,70 @@
+name: Review feedback
+description: Question, gap, error or suggestion on the OAEF material (v0.2 review).
+title: "[Review] <short summary>"
+labels: ["review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reviewing OAEF. One point per issue, please. See `docs/review/03-review-guide.md` for the questions where your view matters most.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Concept / approach
+        - Signal contract and instrumentation (SW)
+        - Qualification layer, oracle, verdicts (TST)
+        - Infrastructure and deployment (INF)
+        - Security, privacy, audit (SEC)
+        - Telemetry data quality and naming (DQ)
+        - Operations and governance (OPS)
+        - MOSIP NIN worked example
+        - Presentation
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type
+      options:
+        - Question
+        - Gap (something missing)
+        - Error (something wrong)
+        - Suggestion
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Reference
+      description: Document and section, requirement or test case id, slide number.
+      placeholder: "OAEF-SPEC-001 §5.4 SEC-02 / VT-SEC-02 / slide 15"
+  - type: textarea
+    id: observation
+    attributes:
+      label: Observation
+      description: What you see, and why it matters for your context.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What you would change. Wording, a new requirement, a different approach.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocking (cannot accept as is)
+        - Important
+        - Minor
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Your context (optional)
+      description: Team, project, platform, tools you use.

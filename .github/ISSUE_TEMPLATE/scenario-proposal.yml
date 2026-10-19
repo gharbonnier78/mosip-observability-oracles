@@ -1,0 +1,40 @@
+name: Scenario proposal
+description: Propose a new test scenario (NIN catalogue or another journey) with its expected results and signals.
+title: "[Scenario] <short summary>"
+labels: ["review", "scenario"]
+body:
+  - type: input
+    id: journey
+    attributes:
+      label: Journey / use case
+      placeholder: "NIN issuance, NIN authentication, resident update, other..."
+    validations:
+      required: true
+  - type: textarea
+    id: path
+    attributes:
+      label: Path through the activity
+      description: Which decision or exception of the activity diagram this scenario exercises.
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Preconditions and test data
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected outcome
+      description: Business result, data state, and the verdict class expected if it fails for the designed reason.
+    validations:
+      required: true
+  - type: textarea
+    id: signals
+    attributes:
+      label: Expected signals (if known)
+      description: Spans, logs, metrics, audit events that prove the outcome.
+  - type: input
+    id: requirements
+    attributes:
+      label: Requirements verified
+      placeholder: "F-05, F-06, NF-04"

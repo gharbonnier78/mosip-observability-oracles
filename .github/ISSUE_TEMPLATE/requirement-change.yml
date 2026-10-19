@@ -1,0 +1,45 @@
+name: Requirement change
+description: Add, modify or remove an OAEF requirement (OAEF-SW/TST/INF/SEC/DQ/OPS-nn).
+title: "[Requirement] <id or new> - <short summary>"
+labels: ["review", "requirement"]
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Change
+      options:
+        - Add a requirement
+        - Modify a requirement
+        - Remove a requirement
+        - Change priority (M / S / C)
+        - Change acceptance criterion
+    validations:
+      required: true
+  - type: input
+    id: req
+    attributes:
+      label: Requirement id
+      placeholder: "OAEF-SEC-02 (leave empty for a new one)"
+  - type: textarea
+    id: current
+    attributes:
+      label: Current text (if any)
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed text and acceptance criterion
+      description: Make the acceptance criterion verifiable (who checks what, with which evidence).
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Problem solved, risk reduced, cost or constraint.
+    validations:
+      required: true
+  - type: input
+    id: tests
+    attributes:
+      label: Impacted validation test cases
+      placeholder: "VT-SEC-02, new test needed?"

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Review guide
+    url: https://github.com/gharbonnier78/mosip-observability-oracles/blob/main/docs/review/03-review-guide.md
+    about: What to read and the questions where your view matters most.
