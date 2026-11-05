@@ -1,0 +1,46 @@
+name: OAEF V5 S1 contract and mutation checks
+
+on:
+  pull_request:
+    paths:
+      - 'validation/v5_demo.py'
+      - 'tests/test_v5_slice.py'
+      - 'contracts/NIN-001-v5-slice.json'
+      - '.github/workflows/oaef-v5-s1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-oracle-s1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test nominal counts and mutation detection
+        run: python3 -m unittest discover -s tests -v
+      - name: Produce a nominal and intentionally failing sample
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          python3 validation/v5_demo.py run --count 100 --seed 20261105 --out artifacts/nominal
+          if python3 validation/v5_demo.py run --count 100 --seed 20261105 --fault duplicate --target 17 --out artifacts/duplicate; then
+            echo "ERROR: Duplicate mutant escaped oracle detection"
+            exit 1
+          fi
+          python3 validation/v5_demo.py verify --out artifacts/nominal
+          if python3 validation/v5_demo.py verify --out artifacts/duplicate; then
+            echo "ERROR: Offline duplicate verification unexpectedly passed"
+            exit 1
+          fi
+      - name: Archive simulated evidence fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaef-v5-s1-synthetic-evidence
+          path: artifacts/
+          retention-days: 7
