@@ -79,7 +79,10 @@ def generate(count, seed, fault, target, out, otlp_url):
     contract = load(CONTRACT)
     rng = random.Random(seed)
     run_id = 's1-' + deterministic_id(seed, count, 'run', 'id', 12)
-    base = 1_800_000_000_000_000_000  # fixed synthetic time to permit offline replay
+    # Live export must use recent timestamps so traces/logs are discoverable in Grafana.
+    # Offline runs stay byte-for-byte deterministic for a fixed seed and count.
+    base = time.time_ns() - 30_000_000_000 if otlp_url else 1_800_000_000_000_000_000
+    tx_spacing = 200_000_000 if otlp_url else 5_000_000_000
     source = attrs({'service.name': 'oaef-s1-simulator', 'service.namespace': 'oaef',
                     'deployment.environment.name': 'test-int', 'oaef.simulation.mode': 'S1'})
     spans, logs, ledger = [], [], []
@@ -92,7 +95,7 @@ def generate(count, seed, fault, target, out, otlp_url):
         if fault == 'slow' and tx == target:
             duration_ms = contract['max_upload_to_assignment_ms'] + 150
         durations.append(duration_ms / 1000)
-        started = base + tx * 5_000_000_000
+        started = base + tx * tx_spacing
         prev = ''
         for i, event in enumerate(EVENTS):
             span_id = deterministic_id(seed, run_id, tx_id, str(i), 16)
@@ -143,7 +146,7 @@ def generate(count, seed, fault, target, out, otlp_url):
               'histogram': {'aggregationTemporality': 2, 'dataPoints': [{
                   'attributes': attrs({'oaef.simulation.mode': 'S1'}),
                   'startTimeUnixNano': str(base),
-                  'timeUnixNano': str(base + (count + 1) * 5_000_000_000),
+                  'timeUnixNano': str(base + (count + 1) * tx_spacing),
                   'count': str(actual_count), 'sum': sum(durations),
                   'explicitBounds': BOUNDS, 'bucketCounts': bucket_counts}]}}
     otlp = {'traces': {'resourceSpans': [{'resource': {'attributes': source},
@@ -159,6 +162,7 @@ def generate(count, seed, fault, target, out, otlp_url):
                                   'transactions': count, 'fault': fault, 'target': target,
                                   'scope': contract['scope'], 'contract_sha256': hashlib.sha256(CONTRACT.read_bytes()).hexdigest(),
                                   'otlp_status': 'not_requested' if not otlp_url else 'attempted'})
+    print('run id:', run_id, '| example trace id:', spans[0]['traceId'])
     if otlp_url:
         emit(otlp_url, otlp)  # offline verdict below does not prove remote ingestion
     return verify(out)
