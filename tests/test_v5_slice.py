@@ -1,5 +1,8 @@
 """No dependencies required: python3 -m unittest discover -s tests -v."""
 import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+import time
 import subprocess
 import sys
 import tempfile
@@ -57,6 +60,36 @@ class V5SyntheticSlice(unittest.TestCase):
         self.assertEqual(p.returncode, 1)
         fails = [c for c in v['failures'] if c['check_id'] == 'EVENT-EXACT-' + event]
         self.assertEqual({c['transaction_id'] for c in fails}, {'TX-001', 'TX-002'})
+
+    def test_optional_otlp_http_posts_three_signals_with_recent_timestamps(self):
+        received = {}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers['Content-Length']))
+                received[self.path] = json.loads(body)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{}')
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(('127.0.0.1', 0), Handler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        with tempfile.TemporaryDirectory() as tmp:
+            p = subprocess.run([sys.executable, str(SCRIPT), 'run', '--count', '3',
+                                '--target', '1', '--seed', '310', '--out', tmp,
+                                '--otlp', f'http://127.0.0.1:{server.server_address[1]}'],
+                               capture_output=True, text=True, timeout=15)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(set(received), {'/v1/traces', '/v1/logs', '/v1/metrics'})
+        spans = received['/v1/traces']['resourceSpans'][0]['scopeSpans'][0]['spans']
+        self.assertEqual(len(spans), 9)
+        self.assertLess(abs(int(spans[0]['startTimeUnixNano']) - time.time_ns()), 120_000_000_000)
 
     def test_span_mutation_not_hidden_by_global_count(self):
         out, _, _ = self.run_case(3)
