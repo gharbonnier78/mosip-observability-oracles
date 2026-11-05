@@ -1,0 +1,16 @@
+{
+  "schema": "oaef.synthetic.slice/v1",
+  "scenario": "NIN-001",
+  "scope": "S1 simulated 3-milestone vertical slice, NOT full MOSIP NIN-001 conformance",
+  "requirement_refs": ["F-07", "F-08", "NF-04", "NF-08"],
+  "model_refs": ["models/nin-enrolment-activity.puml"],
+  "required_events": [
+    "mosip.registration.packet.received",
+    "mosip.identity.uin.assigned",
+    "mosip.identity.activated"
+  ],
+  "max_upload_to_assignment_ms": 2000,
+  "metric_name": "oaef.synthetic.journey.duration",
+  "metric_unit": "s",
+  "notes": "The 2-second threshold is a DEMO-only threshold, NOT the 24-hour NF-04 requirement. These three events are a selected subset of the full workflow."
+}
