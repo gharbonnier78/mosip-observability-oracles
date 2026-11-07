@@ -1,0 +1,3549 @@
+{
+ "schema": "oaef.contract/v3",
+ "scenario": "NIN-001",
+ "generated_by": "tools/oaef_compile.py",
+ "sources": {
+  "oracles/NIN-001.oracle.yaml": "44c31c8f659a2ac0368bf7e66d09b325ebb6d3d8af816b6258b1c192e0cee6e2",
+  "models/nin-requirements.md": "53c171bf7fe5125330e3c7582b42adba4d125f12d403e620a672d6c63dd89349",
+  "models/nin-enrolment-activity.puml": "053d94636e332cdb2bb56cd31bc8d5fbc3b6a8496825b013282b8ed0a33f2e6d"
+ },
+ "metadata": {
+  "scenario": "NIN-001",
+  "persona": "adult-nohit",
+  "prerequisites": "env-nin-baseline",
+  "mosip_release": "1.2.0.x",
+  "otel_java_agent": "2.x.y",
+  "golden_run": "evidence/golden/NIN-001/<run-id>"
+ },
+ "settle": {
+  "min_wait_s": 40,
+  "stable_polls": 2,
+  "poll_interval_s": 15,
+  "max_wait_s": 300
+ },
+ "variables": [
+  "ci.pipeline.name",
+  "config.mosip.kernel.uin.length",
+  "env.cluster",
+  "env.id",
+  "env.name",
+  "env.site",
+  "env.site_role",
+  "packet.sha256.upper",
+  "packet.size",
+  "persona.dateOfBirth",
+  "persona.fullName",
+  "resident.email",
+  "resident.phone",
+  "rid",
+  "run.id",
+  "schema.idVersion",
+  "t0",
+  "t_end",
+  "topic.pkr_out",
+  "trace.ids_regex",
+  "trace.root",
+  "uin",
+  "uin_hash",
+  "vid",
+  "window"
+ ],
+ "trace_set": {
+  "T1": {
+   "root": "ROOT"
+  },
+  "T2": {
+   "locate_by": "span link to IDREPO_CREATE_SERVER (WP0-SW-04); fallback before SW-04: log attribute requestId from idrepo-identity -> trace_id",
+   "note": "credential request batch job starts a NEW trace (scheduled job, no parent)"
+  },
+  "T3": {
+   "locate_by": "span link to the WebSub publisher span (WP0-SW-04); fallback: log correlation on credential id",
+   "note": "WebSub delivery starts a NEW trace"
+  }
+ },
+ "common_span_rules": {
+  "every_span": {
+   "traceId": {
+    "$re": "^[0-9a-f]{32}$"
+   },
+   "spanId": {
+    "$re": "^[0-9a-f]{16}$"
+   },
+   "endTimeUnixNano": ">= startTimeUnixNano",
+   "resource": {
+    "deployment.environment.name": {
+     "$ref": "env.name"
+    },
+    "k8s.cluster.name": {
+     "$ref": "env.cluster"
+    },
+    "cloud.region": {
+     "$ref": "env.site"
+    },
+    "oaef.site.role": {
+     "$ref": "env.site_role"
+    },
+    "oaef.env.id": {
+     "$ref": "env.id"
+    },
+    "service.namespace": {
+     "$in": [
+      "mosip",
+      "jarvis"
+     ]
+    }
+   },
+   "attributes": {
+    "cicd.pipeline.run.id": {
+     "$ref": "run.id"
+    },
+    "test.case.name": "NIN-001"
+   }
+  },
+  "every_child_span": "parentSpanId refers to a span of the same trace; child start >= parent start (clock skew tolerance 50 ms)"
+ },
+ "spans": [
+  {
+   "alias": "ROOT",
+   "requirements": [
+    "F-01",
+    "F-03"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "jarvis-e2e"
+   },
+   "scope": {
+    "name": "jarvis"
+   },
+   "name": "NIN-001 New adult registration no hit",
+   "kind": 1,
+   "parentSpanId": "",
+   "attributes": {
+    "cicd.pipeline.run.id": {
+     "$ref": "run.id"
+    },
+    "test.case.name": "NIN-001",
+    "test.suite.name": "TC-NIN",
+    "oaef.test.persona": "adult-nohit",
+    "oaef.test.verdict": {
+     "$in": [
+      "PASS",
+      "PASS_OBSERVABILITY_DEFECT",
+      "INCONCLUSIVE",
+      "INFRA",
+      "SILENT_FAILURE",
+      "TEST_DATA_CONFIG",
+      "PRODUCT_BUG"
+     ]
+    },
+    "test.case.result.status": {
+     "$in": [
+      "pass",
+      "fail"
+     ]
+    },
+    "cicd.pipeline.name": {
+     "$ref": "ci.pipeline.name"
+    }
+   },
+   "status": {
+    "code": {
+     "$in": [
+      1,
+      2
+     ]
+    }
+   },
+   "capture": {
+    "traceId": "trace.root",
+    "spanId": "span.root"
+   }
+  },
+  {
+   "alias": "STEP_UPLOAD",
+   "requirements": [
+    "F-03",
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "jarvis-e2e"
+   },
+   "name": {
+    "$re": "^step: Jarvis uploads .*registrationpackets.*$"
+   },
+   "kind": 1,
+   "parent": "ROOT"
+  },
+  {
+   "alias": "JARVIS_UPLOAD_CLIENT",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "jarvis-e2e"
+   },
+   "name": "POST",
+   "kind": 3,
+   "parent": "STEP_UPLOAD",
+   "attributes": {
+    "http.request.method": "POST",
+    "url.full": {
+     "$re": "^https://[^/]+/registrationprocessor/v1/packetreceiver/registrationpackets$"
+    },
+    "server.address": {
+     "$exists": true
+    },
+    "http.response.status_code": 200
+   },
+   "status": {
+    "code": 0
+   }
+  },
+  {
+   "alias": "PKR_SERVER",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "regproc-pkr"
+   },
+   "name": {
+    "$re": "^POST (/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+   },
+   "kind": 2,
+   "parent": "JARVIS_UPLOAD_CLIENT",
+   "attributes": {
+    "http.request.method": "POST",
+    "url.path": "/registrationprocessor/v1/packetreceiver/registrationpackets",
+    "url.scheme": {
+     "$in": [
+      "http",
+      "https"
+     ]
+    },
+    "http.route": {
+     "$re": "^(/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+    },
+    "http.response.status_code": 200,
+    "network.protocol.version": {
+     "$in": [
+      "1.1",
+      "2"
+     ]
+    },
+    "mosip.rid": {
+     "$ref": "rid"
+    }
+   },
+   "status": {
+    "code": 0
+   },
+   "duration_ms": {
+    "$lte": 5000
+   }
+  },
+  {
+   "alias": "PKR_DB_INSERT_REGISTRATION",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "regproc-pkr"
+   },
+   "name": {
+    "$re": "^INSERT .*registration$"
+   },
+   "kind": 3,
+   "parent_ancestor": "PKR_SERVER",
+   "attributes": {
+    "db.system.name": "postgresql",
+    "db.namespace": "mosip_regprc",
+    "db.operation.name": "INSERT",
+    "db.collection.name": "registration"
+   },
+   "count": {
+    "$gte": 1
+   }
+  },
+  {
+   "alias": "PKR_AUDIT_CLIENT",
+   "requirements": [
+    "F-10"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "regproc-pkr"
+   },
+   "name": "POST",
+   "kind": 3,
+   "parent_ancestor": "PKR_SERVER",
+   "attributes": {
+    "http.request.method": "POST",
+    "url.full": {
+     "$re": "^https?://[^/]+/v1/auditmanager/audits$"
+    },
+    "http.response.status_code": 200
+   }
+  },
+  {
+   "alias": "AUDIT_SERVER",
+   "requirements": [
+    "F-10"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "auditmanager"
+   },
+   "name": {
+    "$re": "^POST (/v1/auditmanager)?/audits$"
+   },
+   "kind": 2,
+   "parent": "PKR_AUDIT_CLIENT",
+   "attributes": {
+    "http.response.status_code": 200
+   }
+  },
+  {
+   "alias": "AUDIT_DB_INSERT",
+   "requirements": [
+    "F-10"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "auditmanager"
+   },
+   "name": {
+    "$re": "^INSERT .*app_audit_log$"
+   },
+   "kind": 3,
+   "parent_ancestor": "AUDIT_SERVER",
+   "attributes": {
+    "db.system.name": "postgresql",
+    "db.namespace": "mosip_audit",
+    "db.operation.name": "INSERT",
+    "db.collection.name": "app_audit_log"
+   }
+  },
+  {
+   "alias": "PKR_KAFKA_PUBLISH",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "regproc-pkr"
+   },
+   "name": {
+    "$re": "^.+ publish$"
+   },
+   "kind": 4,
+   "parent_ancestor": "PKR_SERVER",
+   "attributes": {
+    "messaging.system": "kafka",
+    "messaging.operation": "publish",
+    "messaging.destination.name": {
+     "$cap": "topic.pkr_out"
+    }
+   }
+  },
+  {
+   "alias": "UPLOADER_PROCESS",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": {
+     "$re": "^regproc-group[1-7]$"
+    }
+   },
+   "name": {
+    "$re": "^.+ process$"
+   },
+   "kind": 5,
+   "parent": "PKR_KAFKA_PUBLISH",
+   "attributes": {
+    "messaging.system": "kafka",
+    "messaging.operation": "process",
+    "messaging.destination.name": {
+     "$ref": "topic.pkr_out"
+    },
+    "messaging.kafka.consumer.group": {
+     "$exists": true
+    },
+    "mosip.rid": {
+     "$ref": "rid"
+    }
+   }
+  },
+  {
+   "alias": "UPLOADER_DECRYPT",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": {
+     "$re": "^regproc-group[1-7]$"
+    }
+   },
+   "name": "POST",
+   "kind": 3,
+   "parent_ancestor": "UPLOADER_PROCESS",
+   "attributes": {
+    "url.full": {
+     "$re": "^https?://[^/]+/v1/keymanager/decrypt$"
+    },
+    "http.response.status_code": 200
+   }
+  },
+  {
+   "alias": "UPLOADER_S3_PUT",
+   "requirements": [
+    "F-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": {
+     "$re": "^regproc-group[1-7]$"
+    }
+   },
+   "name": "S3.PutObject",
+   "kind": 3,
+   "parent_ancestor": "UPLOADER_PROCESS",
+   "attributes": {
+    "rpc.system": "aws-api",
+    "rpc.service": "S3",
+    "rpc.method": "PutObject"
+   }
+  },
+  {
+   "alias": "STAGE_PROCESS",
+   "requirements": [
+    "F-04",
+    "F-05"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": {
+     "$re": "^regproc-group[1-7]$"
+    }
+   },
+   "name": {
+    "$re": "^.+ process$"
+   },
+   "kind": 5,
+   "parent_kind": 4,
+   "attributes": {
+    "mosip.rid": {
+     "$ref": "rid"
+    }
+   },
+   "count": {
+    "$gte": 8
+   },
+   "status": {
+    "code": 0
+   }
+  },
+  {
+   "alias": "UINGEN_GET_UIN_CLIENT",
+   "requirements": [
+    "F-07"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": {
+     "$re": "^regproc-group[1-7]$"
+    }
+   },
+   "name": "GET",
+   "kind": 3,
+   "parent_kind_ancestor": 5,
+   "attributes": {
+    "url.full": {
+     "$re": "^https?://[^/]+/v1/idgenerator/uin$"
+    },
+    "http.response.status_code": 200
+   }
+  },
+  {
+   "alias": "IDGEN_GET_SERVER",
+   "requirements": [
+    "F-07"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "idgenerator"
+   },
+   "name": {
+    "$re": "^GET (/v1/idgenerator)?/uin$"
+   },
+   "kind": 2,
+   "parent": "UINGEN_GET_UIN_CLIENT"
+  },
+  {
+   "alias": "IDGEN_PUT_SERVER",
+   "requirements": [
+    "F-07"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "idgenerator"
+   },
+   "name": {
+    "$re": "^PUT (/v1/idgenerator)?/uin$"
+   },
+   "kind": 2,
+   "after": "IDREPO_CREATE_SERVER"
+  },
+  {
+   "alias": "IDREPO_CREATE_SERVER",
+   "requirements": [
+    "F-07",
+    "F-08"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "idrepo-identity"
+   },
+   "name": {
+    "$re": "^POST (/idrepository/v1/identity)?/?$"
+   },
+   "kind": 2,
+   "parent_kind": 3,
+   "after": "IDGEN_GET_SERVER",
+   "attributes": {
+    "http.response.status_code": 200
+   }
+  },
+  {
+   "alias": "IDREPO_ENCRYPT_CLIENT",
+   "requirements": [
+    "F-08"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "idrepo-identity"
+   },
+   "name": "POST",
+   "kind": 3,
+   "parent_ancestor": "IDREPO_CREATE_SERVER",
+   "attributes": {
+    "url.full": {
+     "$re": "^https?://[^/]+/v1/keymanager/encrypt$"
+    }
+   },
+   "count": {
+    "$gte": 1
+   }
+  },
+  {
+   "alias": "IDREPO_DB_INSERT_UIN",
+   "requirements": [
+    "F-07",
+    "F-08"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "idrepo-identity"
+   },
+   "name": {
+    "$re": "^INSERT .*uin$"
+   },
+   "kind": 3,
+   "parent_ancestor": "IDREPO_CREATE_SERVER",
+   "attributes": {
+    "db.system.name": "postgresql",
+    "db.namespace": "mosip_idrepo",
+    "db.collection.name": "uin"
+   }
+  },
+  {
+   "alias": "JARVIS_STATUS_POLL",
+   "requirements": [
+    "NF-04"
+   ],
+   "trace": "T1",
+   "resource": {
+    "service.name": "jarvis-e2e"
+   },
+   "name": "POST",
+   "kind": 3,
+   "parent_ancestor": "ROOT",
+   "attributes": {
+    "url.full": {
+     "$re": "^https://[^/]+/registrationprocessor/v1/registrationstatus/search$"
+    },
+    "http.response.status_code": 200
+   },
+   "count": {
+    "$gte": 1,
+    "$lte": 60
+   }
+  }
+ ],
+ "links": [
+  {
+   "alias": "LINK_CREDENTIAL_BATCH",
+   "requirements": [
+    "F-08"
+   ],
+   "trace": "T2",
+   "span": {
+    "kind": {
+     "$in": [
+      1,
+      5
+     ]
+    },
+    "parentSpanId": ""
+   },
+   "link_to": "IDREPO_CREATE_SERVER",
+   "attributes": {
+    "mosip.rid": {
+     "$ref": "rid"
+    },
+    "test.case.name": "NIN-001"
+   }
+  },
+  {
+   "alias": "LINK_WEBSUB_DELIVERY",
+   "requirements": [
+    "F-08"
+   ],
+   "trace": "T3",
+   "span": {
+    "kind": 2,
+    "parentSpanId": ""
+   },
+   "link_to_trace": "T2",
+   "attributes": {
+    "mosip.uin_hash": {
+     "$ref": "uin_hash"
+    }
+   }
+  }
+ ],
+ "span_forbidden": [
+  "any span with status.code == 2 in T1, T2, T3",
+  "any span event name == 'exception' in services regproc-*, idrepo-*, idgenerator, keymanager"
+ ],
+ "logs": {
+  "query": {
+   "tenant": "app",
+   "logql": "{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", service_name=~\"regproc-.*|idrepo-.*|idgenerator|keymanager|auditmanager\"} | trace_id=~\"${trace.ids_regex}\" or mosip_rid=\"${rid}\""
+  },
+  "every_record_from_traced_thread": {
+   "traceId": {
+    "$re": "^[0-9a-f]{32}$"
+   },
+   "spanId": {
+    "$re": "^[0-9a-f]{16}$"
+   },
+   "flags": 1,
+   "resource": {
+    "service.name": {
+     "$exists": true
+    },
+    "k8s.pod.name": {
+     "$exists": true
+    },
+    "deployment.environment.name": {
+     "$ref": "env.name"
+    },
+    "cloud.region": {
+     "$ref": "env.site"
+    },
+    "k8s.cluster.name": {
+     "$ref": "env.cluster"
+    }
+   }
+  },
+  "expected": [
+   {
+    "alias": "LOG_PKR_RECEIVED",
+    "requirements": [
+     "F-04"
+    ],
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "severityNumber": 9,
+    "severityText": "INFO",
+    "body": {
+     "$re": "(?s).*${rid}.*"
+    },
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "spanId": {
+     "$span_of": [
+      "PKR_SERVER"
+     ],
+     "$descendant_ok": true
+    },
+    "count": {
+     "$gte": 1
+    }
+   },
+   {
+    "alias": "LOG_STAGE_SUCCESS",
+    "requirements": [
+     "F-04",
+     "F-05"
+    ],
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "severityNumber": 9,
+    "body": {
+     "$re": "(?s).*${rid}.*"
+    },
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "count": {
+     "$gte": 8
+    }
+   },
+   {
+    "alias": "LOG_IDREPO_CREATED",
+    "requirements": [
+     "F-08"
+    ],
+    "resource": {
+     "service.name": "idrepo-identity"
+    },
+    "severityNumber": 9,
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  ],
+  "forbidden": [
+   "severityNumber >= 17 with traceId in trace set or body containing ${rid}",
+   "body or attribute containing ${uin} or ${vid} or ${resident.phone} or ${resident.email}"
+  ],
+  "pii_allow_list": [
+   {
+    "service.name": "notifier",
+    "fields": [
+     "resident.email"
+    ]
+   }
+  ]
+ },
+ "events": {
+  "query": {
+   "tenant": "app",
+   "logql": "{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\"} | event_name=~\"mosip\\\\..+\" | mosip_rid=\"${rid}\" or mosip_uin_hash=\"${uin_hash}\""
+  },
+  "catalogue_version": {
+   "$golden": true
+  },
+  "every_event": {
+   "eventName": {
+    "$re": "^mosip\\.[a-z_.]+$"
+   },
+   "traceId": {
+    "$re": "^[0-9a-f]{32}$"
+   },
+   "spanId": {
+    "$re": "^[0-9a-f]{16}$"
+   },
+   "severityNumber": 9,
+   "forbidden_attribute_values": [
+    "${uin}",
+    "${vid}",
+    "${resident.phone}",
+    "${resident.email}"
+   ]
+  },
+  "expected_ordered_subsequence": [
+   {
+    "alias": "EV_PACKET_RECEIVED",
+    "requirements": [
+     "F-04"
+    ],
+    "eventName": "mosip.registration.packet.received",
+    "trace": "T1",
+    "span_of": "PKR_SERVER",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.reg_type": "NEW"
+    }
+   },
+   {
+    "alias": "EV_STAGE_COMPLETED",
+    "requirements": [
+     "F-04",
+     "F-05"
+    ],
+    "eventName": "mosip.registration.stage.completed",
+    "trace": "T1",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.stage": {
+      "$exists": true
+     },
+     "mosip.stage.status": "SUCCESS"
+    },
+    "count": {
+     "$gte": 8
+    }
+   },
+   {
+    "alias": "EV_UIN_ASSIGNED",
+    "requirements": [
+     "F-07"
+    ],
+    "eventName": "mosip.identity.uin.assigned",
+    "trace": "T1",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     }
+    }
+   },
+   {
+    "alias": "EV_IDENTITY_ACTIVATED",
+    "requirements": [
+     "F-08"
+    ],
+    "eventName": "mosip.identity.activated",
+    "trace": "T1",
+    "span_of": "IDREPO_CREATE_SERVER",
+    "attributes": {
+     "mosip.uin_hash": {
+      "$ref": "uin_hash"
+     }
+    }
+   },
+   {
+    "alias": "EV_CREDENTIAL_ISSUED",
+    "requirements": [
+     "F-08"
+    ],
+    "eventName": "mosip.credential.issued",
+    "trace": "T2",
+    "attributes": {
+     "mosip.uin_hash": {
+      "$ref": "uin_hash"
+     }
+    }
+   },
+   {
+    "alias": "EV_NOTIFICATION_SENT",
+    "requirements": [
+     "F-09"
+    ],
+    "eventName": "mosip.notification.sent",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.notification.channel": {
+      "$in": [
+       "email",
+       "sms"
+      ]
+     }
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  ],
+  "stage_sequence": "mosip.stage values of EV_STAGE_COMPLETED == db.regprc_transactions.ordered_subsequence minus PACKET_RECEIVER",
+  "durations": [
+   {
+    "id": "NF-04",
+    "from": "EV_PACKET_RECEIVED",
+    "to": "EV_IDENTITY_ACTIVATED",
+    "expect_s": {
+     "$lte": 86400
+    }
+   },
+   {
+    "id": "NF-05",
+    "from": "EV_IDENTITY_ACTIVATED",
+    "to": "EV_NOTIFICATION_SENT",
+    "expect_s": {
+     "$lte": 900
+    }
+   }
+  ],
+  "forbidden": [
+   "eventName == mosip.registration.stage.completed with mosip.stage.status != SUCCESS"
+  ],
+  "audit_alignment": "every audit row (section 5) has one catalogue event with the same trace_id and span_id (WP0-SW-05)"
+ },
+ "metrics": {
+  "baseline": [
+   {
+    "id": "M1",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/regproc-pkr\", http_route=~\".*registrationpackets\", http_request_method=\"POST\", http_response_status_code=\"200\"})"
+   },
+   {
+    "id": "M2",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/idgenerator\", http_route=~\".*/uin\", http_request_method=\"GET\", http_response_status_code=\"200\"})"
+   },
+   {
+    "id": "M3",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/idrepo-identity\", http_request_method=\"POST\", http_response_status_code=\"200\"})"
+   },
+   {
+    "id": "M4",
+    "promql": "sum(traces_span_metrics_calls_total{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", service_name=\"auditmanager\", span_kind=\"SPAN_KIND_SERVER\", status_code!=\"STATUS_CODE_ERROR\"})"
+   },
+   {
+    "id": "M5",
+    "promql": "sum(traces_span_metrics_calls_total{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", service_name=~\"regproc-.*|idrepo-.*|idgenerator|keymanager\", status_code=\"STATUS_CODE_ERROR\"})"
+   }
+  ],
+  "assertions": [
+   {
+    "id": "M1",
+    "delta": {
+     "$gte": 1
+    }
+   },
+   {
+    "id": "M2",
+    "delta": {
+     "$gte": 1
+    }
+   },
+   {
+    "id": "M3",
+    "delta": {
+     "$gte": 1
+    }
+   },
+   {
+    "id": "M4",
+    "delta": {
+     "$gte": 10
+    }
+   },
+   {
+    "id": "M5",
+    "delta": 0
+   },
+   {
+    "id": "ENV1",
+    "promql": "count(http_server_request_duration_seconds_count{job=\"mosip/regproc-pkr\", deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", k8s_cluster_name=\"${env.cluster}\"})",
+    "expect": {
+     "$gte": 1
+    }
+   },
+   {
+    "id": "ENV2",
+    "promql": "count(target_info{deployment_environment_name=\"${env.name}\", service_namespace=\"mosip\", cloud_region!=\"${env.site}\"}) or vector(0)",
+    "expect": 0
+   },
+   {
+    "id": "X1",
+    "api": "GET /prometheus/api/v1/query_exemplars?query=http_server_request_duration_seconds_bucket{job=\"regproc-pkr\"}&start=${t0}&end=${t_end}",
+    "expect": "at least one exemplar with labels.trace_id == ${trace.root}"
+   }
+  ],
+  "otlp_shape": {
+   "name": "http.server.request.duration",
+   "unit": "s",
+   "type": "histogram",
+   "aggregationTemporality": 2,
+   "explicitBounds": [
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.075,
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    1,
+    2.5,
+    5,
+    7.5,
+    10
+   ],
+   "dataPoint_attributes": [
+    "http.request.method",
+    "http.route",
+    "http.response.status_code",
+    "url.scheme",
+    "network.protocol.version"
+   ]
+  }
+ },
+ "nfr": {
+  "e2e_upload_to_processed_s": {
+   "$lte": 600
+  },
+  "span_budgets_ms": {
+   "PKR_SERVER": {
+    "$lte": 5000
+   },
+   "UPLOADER_PROCESS": {
+    "$lte": 30000
+   },
+   "IDREPO_CREATE_SERVER": {
+    "$lte": 3000
+   },
+   "IDGEN_GET_SERVER": {
+    "$lte": 500
+   }
+  },
+  "infra_window_checks": [
+   {
+    "promql": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"regproc|idrepo|kernel|keymanager|ida\"}[${window}]))",
+    "expect": 0
+   },
+   {
+    "promql": "max_over_time(kafka_consumergroup_lag{consumergroup=~\"regproc.*\"}[${window}])",
+    "expect": "back to 0 at t_end"
+   }
+  ],
+  "security": {
+   "NFR-SEC-01": "logs.forbidden[1] and no span attribute value equal to ${uin}, ${vid}"
+  }
+ },
+ "verdict": {
+  "functional_checks": [
+   "rules",
+   "api",
+   "db",
+   "notification",
+   "feature Then-steps"
+  ],
+  "signal_contract": [
+   "traces.spans",
+   "traces.links",
+   "logs.expected",
+   "events",
+   "metrics.assertions",
+   "audit"
+  ],
+  "informative_only": [
+   "profiles"
+  ],
+  "classes": {
+   "PASS": "functional OK and signal_contract 100 %",
+   "PASS_OBSERVABILITY_DEFECT": "functional OK and signal_contract < 100 %",
+   "INCONCLUSIVE": "settle.max_wait_s exceeded or OBS-02 violated during window",
+   "INFRA": "functional KO and infra_window_checks violated",
+   "SILENT_FAILURE": "functional KO and no ERROR span/log for the failing step",
+   "TEST_DATA_CONFIG": "functional KO with business rejection code mapped to masterdata/partner config",
+   "PRODUCT_BUG": "functional KO with ERROR span + exception event in a MOSIP service, infra clean"
+  }
+ },
+ "functional": {
+  "rules": {
+   "uin": {
+    "length": "${config.mosip.kernel.uin.length}",
+    "regex": "^[2-9][0-9]{${config.mosip.kernel.uin.length - 1}}$",
+    "checksum": "verhoeff",
+    "max_ascending_or_descending_sequence": 2,
+    "repeating_limit": 2,
+    "repeating_block_limit": 2,
+    "restricted_numbers": "from mosip_kernel restricted list",
+    "unique": "SELECT count(*) FROM mosip_kernel.uin WHERE uin='${uin}' -> 1"
+   },
+   "vid": {
+    "length": 16,
+    "regex": "^[2-9][0-9]{15}$",
+    "checksum": "verhoeff",
+    "type": "PERPETUAL"
+   },
+   "rid": {
+    "regex": "^1000110001[0-9]{5}[0-9]{14}$"
+   }
+  },
+  "api": {
+   "idrepo_read": {
+    "http_status": 200,
+    "body": {
+     "id": "mosip.id.read",
+     "version": "v1",
+     "responsetime": {
+      "$re": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+     },
+     "errors": null,
+     "response": {
+      "status": "ACTIVATED",
+      "identity": {
+       "UIN": {
+        "$ref": "uin"
+       },
+       "IDSchemaVersion": {
+        "$ref": "schema.idVersion"
+       },
+       "fullName": {
+        "$ref": "persona.fullName"
+       },
+       "dateOfBirth": {
+        "$ref": "persona.dateOfBirth"
+       }
+      },
+      "documents": {
+       "$re": ".+"
+      }
+     }
+    },
+    "checks": [
+     "response.documents[*].category contains individualBiometrics, proofOfAddress, proofOfIdentity",
+     "CBEFF individualBiometrics has 10 Finger + 2 Iris + 1 Face BIRs"
+    ]
+   }
+  },
+  "db": {
+   "regprc_registration_list": {
+    "sql": "SELECT reg_id, reg_type, packet_checksum, packet_size, client_status_code FROM mosip_regprc.registration_list WHERE reg_id = '${rid}'",
+    "expect_rows": 1,
+    "row": {
+     "reg_id": {
+      "$ref": "rid"
+     },
+     "reg_type": "NEW",
+     "packet_checksum": {
+      "$ref": "packet.sha256.upper"
+     },
+     "packet_size": {
+      "$ref": "packet.size"
+     },
+     "client_status_code": "APPROVED"
+    }
+   },
+   "regprc_transactions": {
+    "sql": "SELECT trn_type_code, status_code FROM mosip_regprc.registration_transaction WHERE reg_id = '${rid}' ORDER BY cr_dtimes",
+    "expect": {
+     "ordered_subsequence": [
+      "PACKET_RECEIVER",
+      "UPLOAD_PACKET",
+      "VALIDATE_PACKET",
+      "PACKET_CLASSIFICATION",
+      "CMD_VALIDATION",
+      "OPERATOR_VALIDATION",
+      "DEMOGRAPHIC_VERIFICATION",
+      "BIOGRAPHIC_VERIFICATION",
+      "UIN_GENERATOR",
+      "FINALIZATION"
+     ],
+     "forbidden_status_codes": [
+      "FAILED",
+      "ERROR",
+      "REJECTED"
+     ],
+     "max_reprocess": 0
+    },
+    "final": {
+     "sql": "SELECT status_code, reg_process_retry_count FROM mosip_regprc.registration WHERE reg_id = '${rid}'",
+     "row": {
+      "status_code": "PROCESSED",
+      "reg_process_retry_count": 0
+     }
+    }
+   },
+   "idrepo_and_kernel": [
+    {
+     "sql": "SELECT status_code, uin_hash FROM mosip_idrepo.uin WHERE reg_id = '${rid}'",
+     "expect_rows": 1,
+     "row": {
+      "status_code": "ACTIVATED",
+      "uin_hash": {
+       "$re": "^[0-9]+_[0-9A-F]{64}$",
+       "$cap": "uin_hash"
+      }
+     }
+    },
+    {
+     "sql": "SELECT uin_status FROM mosip_kernel.uin WHERE uin = '${uin}'",
+     "row": {
+      "uin_status": "ASSIGNED"
+     }
+    },
+    {
+     "sql": "SELECT vidtyp_code, status_code FROM mosip_idmap.vid WHERE uin_hash = '${uin_hash}'",
+     "expect_rows": 1,
+     "row": {
+      "vidtyp_code": "PERPETUAL",
+      "status_code": "ACTIVE"
+     }
+    }
+   ]
+  },
+  "notification": {
+   "uin_email": {
+    "to": {
+     "$ref": "resident.email"
+    },
+    "subject": {
+     "$golden": true
+    },
+    "body_contains": [
+     "${rid}"
+    ],
+    "count": 1
+   }
+  },
+  "audit": {
+   "sql": "SELECT event_id, event_name, event_type, app_id, app_name, module_id, module_name, ref_id, ref_id_type, host_name, action_dtimes FROM mosip_audit.app_audit_log WHERE ref_id IN ('${rid}', '${uin_hash}') AND action_dtimes BETWEEN '${t0}' AND '${t_end}' ORDER BY action_dtimes\n",
+   "every_row": {
+    "event_id": {
+     "$re": "^[A-Z]{3}_[0-9]{3}$"
+    },
+    "event_type": {
+     "$in": [
+      "BUSINESS",
+      "SYSTEM"
+     ]
+    },
+    "ref_id_type": {
+     "$in": [
+      "REGISTRATION_ID",
+      "UIN_HASH",
+      "RID"
+     ]
+    },
+    "host_name": {
+     "$exists": true
+    }
+   },
+   "expected_modules_ordered_subsequence": [
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "B3",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "C1",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "C4",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "C5",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "C6",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "D1",
+     "ref_id": {
+      "$ref": "rid"
+     }
+    },
+    {
+     "module_name": {
+      "$golden": true
+     },
+     "step": "D2",
+     "ref_id": {
+      "$ref": "uin_hash"
+     }
+    }
+   ],
+   "no_failure_events": "event_name not matching (?i).*(FAIL|EXCEPTION|ERROR).*",
+   "loki_audit_tenant": {
+    "logql": "{stream=\"mosip-audit\"} | json | ref_id=~\"${rid}|${uin_hash}\"",
+    "expect": "same multiset of (event_id, module_id, ref_id) as the SQL result"
+   },
+   "trace_link": {
+    "expect": "every audit row has a matching AUDIT_SERVER span (same host, |time delta| < 2 s)"
+   }
+  }
+ },
+ "obligations": [
+  {
+   "obligation_id": "OBL-RULES-uin",
+   "section": "rules",
+   "key": "uin",
+   "requirement_refs": [
+    "F-01",
+    "F-07"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "length": "${config.mosip.kernel.uin.length}",
+    "regex": "^[2-9][0-9]{${config.mosip.kernel.uin.length - 1}}$",
+    "checksum": "verhoeff",
+    "max_ascending_or_descending_sequence": 2,
+    "repeating_limit": 2,
+    "repeating_block_limit": 2,
+    "restricted_numbers": "from mosip_kernel restricted list",
+    "unique": "SELECT count(*) FROM mosip_kernel.uin WHERE uin='${uin}' -> 1"
+   }
+  },
+  {
+   "obligation_id": "OBL-RULES-vid",
+   "section": "rules",
+   "key": "vid",
+   "requirement_refs": [
+    "F-01",
+    "F-07"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "length": 16,
+    "regex": "^[2-9][0-9]{15}$",
+    "checksum": "verhoeff",
+    "type": "PERPETUAL"
+   }
+  },
+  {
+   "obligation_id": "OBL-RULES-rid",
+   "section": "rules",
+   "key": "rid",
+   "requirement_refs": [
+    "F-01",
+    "F-03"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    }
+   ],
+   "expect": {
+    "regex": "^1000110001[0-9]{5}[0-9]{14}$"
+   }
+  },
+  {
+   "obligation_id": "OBL-API-idrepo_read",
+   "section": "api",
+   "key": "idrepo_read",
+   "requirement_refs": [
+    "F-01",
+    "F-02"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 10,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture fingerprints, irises, face quality check, max 3 retries per modality"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 13,
+     "lane": "Enrolment station (officer)",
+     "activity": "Record biometric exception with photo"
+    }
+   ],
+   "expect": {
+    "http_status": 200,
+    "body": {
+     "id": "mosip.id.read",
+     "version": "v1",
+     "responsetime": {
+      "$re": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+     },
+     "errors": null,
+     "response": {
+      "status": "ACTIVATED",
+      "identity": {
+       "UIN": {
+        "$ref": "uin"
+       },
+       "IDSchemaVersion": {
+        "$ref": "schema.idVersion"
+       },
+       "fullName": {
+        "$ref": "persona.fullName"
+       },
+       "dateOfBirth": {
+        "$ref": "persona.dateOfBirth"
+       }
+      },
+      "documents": {
+       "$re": ".+"
+      }
+     }
+    },
+    "checks": [
+     "response.documents[*].category contains individualBiometrics, proofOfAddress, proofOfIdentity",
+     "CBEFF individualBiometrics has 10 Finger + 2 Iris + 1 Face BIRs"
+    ]
+   }
+  },
+  {
+   "obligation_id": "OBL-DB-regprc_registration_list",
+   "section": "db",
+   "key": "regprc_registration_list",
+   "requirement_refs": [
+    "F-01",
+    "F-06",
+    "F-08",
+    "NF-03"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 21,
+     "lane": "Enrolment station (officer)",
+     "activity": "Queue encrypted packet locally (offline >= h, no loss)"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 24,
+     "lane": "Enrolment station (officer)",
+     "activity": "Sync and upload packet"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 36,
+     "lane": "Adjudicator",
+     "activity": "Manual adjudication"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 39,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject; no NIN consumed"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "sql": "SELECT reg_id, reg_type, packet_checksum, packet_size, client_status_code FROM mosip_regprc.registration_list WHERE reg_id = '${rid}'",
+    "expect_rows": 1,
+    "row": {
+     "reg_id": {
+      "$ref": "rid"
+     },
+     "reg_type": "NEW",
+     "packet_checksum": {
+      "$ref": "packet.sha256.upper"
+     },
+     "packet_size": {
+      "$ref": "packet.size"
+     },
+     "client_status_code": "APPROVED"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-DB-regprc_transactions",
+   "section": "db",
+   "key": "regprc_transactions",
+   "requirement_refs": [
+    "F-01",
+    "F-04",
+    "F-06",
+    "F-08",
+    "NF-03"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 21,
+     "lane": "Enrolment station (officer)",
+     "activity": "Queue encrypted packet locally (offline >= h, no loss)"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 24,
+     "lane": "Enrolment station (officer)",
+     "activity": "Sync and upload packet"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 36,
+     "lane": "Adjudicator",
+     "activity": "Manual adjudication"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 39,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject; no NIN consumed"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "sql": "SELECT trn_type_code, status_code FROM mosip_regprc.registration_transaction WHERE reg_id = '${rid}' ORDER BY cr_dtimes",
+    "expect": {
+     "ordered_subsequence": [
+      "PACKET_RECEIVER",
+      "UPLOAD_PACKET",
+      "VALIDATE_PACKET",
+      "PACKET_CLASSIFICATION",
+      "CMD_VALIDATION",
+      "OPERATOR_VALIDATION",
+      "DEMOGRAPHIC_VERIFICATION",
+      "BIOGRAPHIC_VERIFICATION",
+      "UIN_GENERATOR",
+      "FINALIZATION"
+     ],
+     "forbidden_status_codes": [
+      "FAILED",
+      "ERROR",
+      "REJECTED"
+     ],
+     "max_reprocess": 0
+    },
+    "final": {
+     "sql": "SELECT status_code, reg_process_retry_count FROM mosip_regprc.registration WHERE reg_id = '${rid}'",
+     "row": {
+      "status_code": "PROCESSED",
+      "reg_process_retry_count": 0
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-DB-idrepo_and_kernel",
+   "section": "db",
+   "key": "idrepo_and_kernel",
+   "requirement_refs": [
+    "F-01",
+    "F-06",
+    "F-07",
+    "F-08",
+    "NF-03"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 21,
+     "lane": "Enrolment station (officer)",
+     "activity": "Queue encrypted packet locally (offline >= h, no loss)"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 24,
+     "lane": "Enrolment station (officer)",
+     "activity": "Sync and upload packet"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 36,
+     "lane": "Adjudicator",
+     "activity": "Manual adjudication"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 39,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject; no NIN consumed"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": [
+    {
+     "sql": "SELECT status_code, uin_hash FROM mosip_idrepo.uin WHERE reg_id = '${rid}'",
+     "expect_rows": 1,
+     "row": {
+      "status_code": "ACTIVATED",
+      "uin_hash": {
+       "$re": "^[0-9]+_[0-9A-F]{64}$",
+       "$cap": "uin_hash"
+      }
+     }
+    },
+    {
+     "sql": "SELECT uin_status FROM mosip_kernel.uin WHERE uin = '${uin}'",
+     "row": {
+      "uin_status": "ASSIGNED"
+     }
+    },
+    {
+     "sql": "SELECT vidtyp_code, status_code FROM mosip_idmap.vid WHERE uin_hash = '${uin_hash}'",
+     "expect_rows": 1,
+     "row": {
+      "vidtyp_code": "PERPETUAL",
+      "status_code": "ACTIVE"
+     }
+    }
+   ]
+  },
+  {
+   "obligation_id": "OBL-NOTIFICATION-uin_email",
+   "section": "notification",
+   "key": "uin_email",
+   "requirement_refs": [
+    "F-09",
+    "NF-05",
+    "NF-09"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 55,
+     "lane": "Messaging gateway",
+     "activity": "Send NIN by SMS and email in chosen language within min of issuance"
+    }
+   ],
+   "expect": {
+    "to": {
+     "$ref": "resident.email"
+    },
+    "subject": {
+     "$golden": true
+    },
+    "body_contains": [
+     "${rid}"
+    ],
+    "count": 1
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-ROOT",
+   "section": "traces",
+   "key": "ROOT",
+   "requirement_refs": [
+    "F-01",
+    "F-03",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 8,
+     "lane": "Enrolment station (officer)",
+     "activity": "Capture demographics and documents validated against ID schema and reference data"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    }
+   ],
+   "expect": {
+    "alias": "ROOT",
+    "requirements": [
+     "F-01",
+     "F-03"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "jarvis-e2e"
+    },
+    "scope": {
+     "name": "jarvis"
+    },
+    "name": "NIN-001 New adult registration no hit",
+    "kind": 1,
+    "parentSpanId": "",
+    "attributes": {
+     "cicd.pipeline.run.id": {
+      "$ref": "run.id"
+     },
+     "test.case.name": "NIN-001",
+     "test.suite.name": "TC-NIN",
+     "oaef.test.persona": "adult-nohit",
+     "oaef.test.verdict": {
+      "$in": [
+       "PASS",
+       "PASS_OBSERVABILITY_DEFECT",
+       "INCONCLUSIVE",
+       "INFRA",
+       "SILENT_FAILURE",
+       "TEST_DATA_CONFIG",
+       "PRODUCT_BUG"
+      ]
+     },
+     "test.case.result.status": {
+      "$in": [
+       "pass",
+       "fail"
+      ]
+     },
+     "cicd.pipeline.name": {
+      "$ref": "ci.pipeline.name"
+     }
+    },
+    "status": {
+     "code": {
+      "$in": [
+       1,
+       2
+      ]
+     }
+    },
+    "capture": {
+     "traceId": "trace.root",
+     "spanId": "span.root"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-STEP_UPLOAD",
+   "section": "traces",
+   "key": "STEP_UPLOAD",
+   "requirement_refs": [
+    "F-03",
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "STEP_UPLOAD",
+    "requirements": [
+     "F-03",
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "jarvis-e2e"
+    },
+    "name": {
+     "$re": "^step: Jarvis uploads .*registrationpackets.*$"
+    },
+    "kind": 1,
+    "parent": "ROOT"
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-JARVIS_UPLOAD_CLIENT",
+   "section": "traces",
+   "key": "JARVIS_UPLOAD_CLIENT",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "JARVIS_UPLOAD_CLIENT",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "jarvis-e2e"
+    },
+    "name": "POST",
+    "kind": 3,
+    "parent": "STEP_UPLOAD",
+    "attributes": {
+     "http.request.method": "POST",
+     "url.full": {
+      "$re": "^https://[^/]+/registrationprocessor/v1/packetreceiver/registrationpackets$"
+     },
+     "server.address": {
+      "$exists": true
+     },
+     "http.response.status_code": 200
+    },
+    "status": {
+     "code": 0
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-PKR_SERVER",
+   "section": "traces",
+   "key": "PKR_SERVER",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "PKR_SERVER",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "name": {
+     "$re": "^POST (/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+    },
+    "kind": 2,
+    "parent": "JARVIS_UPLOAD_CLIENT",
+    "attributes": {
+     "http.request.method": "POST",
+     "url.path": "/registrationprocessor/v1/packetreceiver/registrationpackets",
+     "url.scheme": {
+      "$in": [
+       "http",
+       "https"
+      ]
+     },
+     "http.route": {
+      "$re": "^(/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+     },
+     "http.response.status_code": 200,
+     "network.protocol.version": {
+      "$in": [
+       "1.1",
+       "2"
+      ]
+     },
+     "mosip.rid": {
+      "$ref": "rid"
+     }
+    },
+    "status": {
+     "code": 0
+    },
+    "duration_ms": {
+     "$lte": 5000
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-PKR_DB_INSERT_REGISTRATION",
+   "section": "traces",
+   "key": "PKR_DB_INSERT_REGISTRATION",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "PKR_DB_INSERT_REGISTRATION",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "name": {
+     "$re": "^INSERT .*registration$"
+    },
+    "kind": 3,
+    "parent_ancestor": "PKR_SERVER",
+    "attributes": {
+     "db.system.name": "postgresql",
+     "db.namespace": "mosip_regprc",
+     "db.operation.name": "INSERT",
+     "db.collection.name": "registration"
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-PKR_AUDIT_CLIENT",
+   "section": "traces",
+   "key": "PKR_AUDIT_CLIENT",
+   "requirement_refs": [
+    "F-10",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "PKR_AUDIT_CLIENT",
+    "requirements": [
+     "F-10"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "name": "POST",
+    "kind": 3,
+    "parent_ancestor": "PKR_SERVER",
+    "attributes": {
+     "http.request.method": "POST",
+     "url.full": {
+      "$re": "^https?://[^/]+/v1/auditmanager/audits$"
+     },
+     "http.response.status_code": 200
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-AUDIT_SERVER",
+   "section": "traces",
+   "key": "AUDIT_SERVER",
+   "requirement_refs": [
+    "F-10",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "AUDIT_SERVER",
+    "requirements": [
+     "F-10"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "auditmanager"
+    },
+    "name": {
+     "$re": "^POST (/v1/auditmanager)?/audits$"
+    },
+    "kind": 2,
+    "parent": "PKR_AUDIT_CLIENT",
+    "attributes": {
+     "http.response.status_code": 200
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-AUDIT_DB_INSERT",
+   "section": "traces",
+   "key": "AUDIT_DB_INSERT",
+   "requirement_refs": [
+    "F-10",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "AUDIT_DB_INSERT",
+    "requirements": [
+     "F-10"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "auditmanager"
+    },
+    "name": {
+     "$re": "^INSERT .*app_audit_log$"
+    },
+    "kind": 3,
+    "parent_ancestor": "AUDIT_SERVER",
+    "attributes": {
+     "db.system.name": "postgresql",
+     "db.namespace": "mosip_audit",
+     "db.operation.name": "INSERT",
+     "db.collection.name": "app_audit_log"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-PKR_KAFKA_PUBLISH",
+   "section": "traces",
+   "key": "PKR_KAFKA_PUBLISH",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "PKR_KAFKA_PUBLISH",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "name": {
+     "$re": "^.+ publish$"
+    },
+    "kind": 4,
+    "parent_ancestor": "PKR_SERVER",
+    "attributes": {
+     "messaging.system": "kafka",
+     "messaging.operation": "publish",
+     "messaging.destination.name": {
+      "$cap": "topic.pkr_out"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-UPLOADER_PROCESS",
+   "section": "traces",
+   "key": "UPLOADER_PROCESS",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "UPLOADER_PROCESS",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "name": {
+     "$re": "^.+ process$"
+    },
+    "kind": 5,
+    "parent": "PKR_KAFKA_PUBLISH",
+    "attributes": {
+     "messaging.system": "kafka",
+     "messaging.operation": "process",
+     "messaging.destination.name": {
+      "$ref": "topic.pkr_out"
+     },
+     "messaging.kafka.consumer.group": {
+      "$exists": true
+     },
+     "mosip.rid": {
+      "$ref": "rid"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-UPLOADER_DECRYPT",
+   "section": "traces",
+   "key": "UPLOADER_DECRYPT",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "UPLOADER_DECRYPT",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "name": "POST",
+    "kind": 3,
+    "parent_ancestor": "UPLOADER_PROCESS",
+    "attributes": {
+     "url.full": {
+      "$re": "^https?://[^/]+/v1/keymanager/decrypt$"
+     },
+     "http.response.status_code": 200
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-UPLOADER_S3_PUT",
+   "section": "traces",
+   "key": "UPLOADER_S3_PUT",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "UPLOADER_S3_PUT",
+    "requirements": [
+     "F-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "name": "S3.PutObject",
+    "kind": 3,
+    "parent_ancestor": "UPLOADER_PROCESS",
+    "attributes": {
+     "rpc.system": "aws-api",
+     "rpc.service": "S3",
+     "rpc.method": "PutObject"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-STAGE_PROCESS",
+   "section": "traces",
+   "key": "STAGE_PROCESS",
+   "requirement_refs": [
+    "F-04",
+    "F-05",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 33,
+     "lane": "ABIS",
+     "activity": "Demographic and biometric deduplication"
+    }
+   ],
+   "expect": {
+    "alias": "STAGE_PROCESS",
+    "requirements": [
+     "F-04",
+     "F-05"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "name": {
+     "$re": "^.+ process$"
+    },
+    "kind": 5,
+    "parent_kind": 4,
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     }
+    },
+    "count": {
+     "$gte": 8
+    },
+    "status": {
+     "code": 0
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-UINGEN_GET_UIN_CLIENT",
+   "section": "traces",
+   "key": "UINGEN_GET_UIN_CLIENT",
+   "requirement_refs": [
+    "F-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "alias": "UINGEN_GET_UIN_CLIENT",
+    "requirements": [
+     "F-07"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "name": "GET",
+    "kind": 3,
+    "parent_kind_ancestor": 5,
+    "attributes": {
+     "url.full": {
+      "$re": "^https?://[^/]+/v1/idgenerator/uin$"
+     },
+     "http.response.status_code": 200
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-IDGEN_GET_SERVER",
+   "section": "traces",
+   "key": "IDGEN_GET_SERVER",
+   "requirement_refs": [
+    "F-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "alias": "IDGEN_GET_SERVER",
+    "requirements": [
+     "F-07"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "idgenerator"
+    },
+    "name": {
+     "$re": "^GET (/v1/idgenerator)?/uin$"
+    },
+    "kind": 2,
+    "parent": "UINGEN_GET_UIN_CLIENT"
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-IDGEN_PUT_SERVER",
+   "section": "traces",
+   "key": "IDGEN_PUT_SERVER",
+   "requirement_refs": [
+    "F-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "alias": "IDGEN_PUT_SERVER",
+    "requirements": [
+     "F-07"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "idgenerator"
+    },
+    "name": {
+     "$re": "^PUT (/v1/idgenerator)?/uin$"
+    },
+    "kind": 2,
+    "after": "IDREPO_CREATE_SERVER"
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-IDREPO_CREATE_SERVER",
+   "section": "traces",
+   "key": "IDREPO_CREATE_SERVER",
+   "requirement_refs": [
+    "F-07",
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDREPO_CREATE_SERVER",
+    "requirements": [
+     "F-07",
+     "F-08"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "idrepo-identity"
+    },
+    "name": {
+     "$re": "^POST (/idrepository/v1/identity)?/?$"
+    },
+    "kind": 2,
+    "parent_kind": 3,
+    "after": "IDGEN_GET_SERVER",
+    "attributes": {
+     "http.response.status_code": 200
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-IDREPO_ENCRYPT_CLIENT",
+   "section": "traces",
+   "key": "IDREPO_ENCRYPT_CLIENT",
+   "requirement_refs": [
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDREPO_ENCRYPT_CLIENT",
+    "requirements": [
+     "F-08"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "idrepo-identity"
+    },
+    "name": "POST",
+    "kind": 3,
+    "parent_ancestor": "IDREPO_CREATE_SERVER",
+    "attributes": {
+     "url.full": {
+      "$re": "^https?://[^/]+/v1/keymanager/encrypt$"
+     }
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-IDREPO_DB_INSERT_UIN",
+   "section": "traces",
+   "key": "IDREPO_DB_INSERT_UIN",
+   "requirement_refs": [
+    "F-07",
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDREPO_DB_INSERT_UIN",
+    "requirements": [
+     "F-07",
+     "F-08"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "idrepo-identity"
+    },
+    "name": {
+     "$re": "^INSERT .*uin$"
+    },
+    "kind": 3,
+    "parent_ancestor": "IDREPO_CREATE_SERVER",
+    "attributes": {
+     "db.system.name": "postgresql",
+     "db.namespace": "mosip_idrepo",
+     "db.collection.name": "uin"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-JARVIS_STATUS_POLL",
+   "section": "traces",
+   "key": "JARVIS_STATUS_POLL",
+   "requirement_refs": [
+    "NF-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "JARVIS_STATUS_POLL",
+    "requirements": [
+     "NF-04"
+    ],
+    "trace": "T1",
+    "resource": {
+     "service.name": "jarvis-e2e"
+    },
+    "name": "POST",
+    "kind": 3,
+    "parent_ancestor": "ROOT",
+    "attributes": {
+     "url.full": {
+      "$re": "^https://[^/]+/registrationprocessor/v1/registrationstatus/search$"
+     },
+     "http.response.status_code": 200
+    },
+    "count": {
+     "$gte": 1,
+     "$lte": 60
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-LINK_CREDENTIAL_BATCH",
+   "section": "traces",
+   "key": "LINK_CREDENTIAL_BATCH",
+   "requirement_refs": [
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "LINK_CREDENTIAL_BATCH",
+    "requirements": [
+     "F-08"
+    ],
+    "trace": "T2",
+    "span": {
+     "kind": {
+      "$in": [
+       1,
+       5
+      ]
+     },
+     "parentSpanId": ""
+    },
+    "link_to": "IDREPO_CREATE_SERVER",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "test.case.name": "NIN-001"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-TRACES-LINK_WEBSUB_DELIVERY",
+   "section": "traces",
+   "key": "LINK_WEBSUB_DELIVERY",
+   "requirement_refs": [
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "LINK_WEBSUB_DELIVERY",
+    "requirements": [
+     "F-08"
+    ],
+    "trace": "T3",
+    "span": {
+     "kind": 2,
+     "parentSpanId": ""
+    },
+    "link_to_trace": "T2",
+    "attributes": {
+     "mosip.uin_hash": {
+      "$ref": "uin_hash"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-LOGS-LOG_PKR_RECEIVED",
+   "section": "logs",
+   "key": "LOG_PKR_RECEIVED",
+   "requirement_refs": [
+    "F-04",
+    "NF-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "LOG_PKR_RECEIVED",
+    "requirements": [
+     "F-04"
+    ],
+    "resource": {
+     "service.name": "regproc-pkr"
+    },
+    "severityNumber": 9,
+    "severityText": "INFO",
+    "body": {
+     "$re": "(?s).*${rid}.*"
+    },
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "spanId": {
+     "$span_of": [
+      "PKR_SERVER"
+     ],
+     "$descendant_ok": true
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-LOGS-LOG_STAGE_SUCCESS",
+   "section": "logs",
+   "key": "LOG_STAGE_SUCCESS",
+   "requirement_refs": [
+    "F-04",
+    "F-05",
+    "NF-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 33,
+     "lane": "ABIS",
+     "activity": "Demographic and biometric deduplication"
+    }
+   ],
+   "expect": {
+    "alias": "LOG_STAGE_SUCCESS",
+    "requirements": [
+     "F-04",
+     "F-05"
+    ],
+    "resource": {
+     "service.name": {
+      "$re": "^regproc-group[1-7]$"
+     }
+    },
+    "severityNumber": 9,
+    "body": {
+     "$re": "(?s).*${rid}.*"
+    },
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "count": {
+     "$gte": 8
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-LOGS-LOG_IDREPO_CREATED",
+   "section": "logs",
+   "key": "LOG_IDREPO_CREATED",
+   "requirement_refs": [
+    "F-08",
+    "NF-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "LOG_IDREPO_CREATED",
+    "requirements": [
+     "F-08"
+    ],
+    "resource": {
+     "service.name": "idrepo-identity"
+    },
+    "severityNumber": 9,
+    "traceId": {
+     "$ref": "trace.root"
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_PACKET_RECEIVED",
+   "section": "events",
+   "key": "EV_PACKET_RECEIVED",
+   "requirement_refs": [
+    "F-04"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    }
+   ],
+   "expect": {
+    "alias": "EV_PACKET_RECEIVED",
+    "requirements": [
+     "F-04"
+    ],
+    "eventName": "mosip.registration.packet.received",
+    "trace": "T1",
+    "span_of": "PKR_SERVER",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.reg_type": "NEW"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_STAGE_COMPLETED",
+   "section": "events",
+   "key": "EV_STAGE_COMPLETED",
+   "requirement_refs": [
+    "F-04",
+    "F-05"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 33,
+     "lane": "ABIS",
+     "activity": "Demographic and biometric deduplication"
+    }
+   ],
+   "expect": {
+    "alias": "EV_STAGE_COMPLETED",
+    "requirements": [
+     "F-04",
+     "F-05"
+    ],
+    "eventName": "mosip.registration.stage.completed",
+    "trace": "T1",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.stage": {
+      "$exists": true
+     },
+     "mosip.stage.status": "SUCCESS"
+    },
+    "count": {
+     "$gte": 8
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_UIN_ASSIGNED",
+   "section": "events",
+   "key": "EV_UIN_ASSIGNED",
+   "requirement_refs": [
+    "F-07"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    }
+   ],
+   "expect": {
+    "alias": "EV_UIN_ASSIGNED",
+    "requirements": [
+     "F-07"
+    ],
+    "eventName": "mosip.identity.uin.assigned",
+    "trace": "T1",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_IDENTITY_ACTIVATED",
+   "section": "events",
+   "key": "EV_IDENTITY_ACTIVATED",
+   "requirement_refs": [
+    "F-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "EV_IDENTITY_ACTIVATED",
+    "requirements": [
+     "F-08"
+    ],
+    "eventName": "mosip.identity.activated",
+    "trace": "T1",
+    "span_of": "IDREPO_CREATE_SERVER",
+    "attributes": {
+     "mosip.uin_hash": {
+      "$ref": "uin_hash"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_CREDENTIAL_ISSUED",
+   "section": "events",
+   "key": "EV_CREDENTIAL_ISSUED",
+   "requirement_refs": [
+    "F-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "EV_CREDENTIAL_ISSUED",
+    "requirements": [
+     "F-08"
+    ],
+    "eventName": "mosip.credential.issued",
+    "trace": "T2",
+    "attributes": {
+     "mosip.uin_hash": {
+      "$ref": "uin_hash"
+     }
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-EV_NOTIFICATION_SENT",
+   "section": "events",
+   "key": "EV_NOTIFICATION_SENT",
+   "requirement_refs": [
+    "F-09"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 55,
+     "lane": "Messaging gateway",
+     "activity": "Send NIN by SMS and email in chosen language within min of issuance"
+    }
+   ],
+   "expect": {
+    "alias": "EV_NOTIFICATION_SENT",
+    "requirements": [
+     "F-09"
+    ],
+    "eventName": "mosip.notification.sent",
+    "attributes": {
+     "mosip.rid": {
+      "$ref": "rid"
+     },
+     "mosip.notification.channel": {
+      "$in": [
+       "email",
+       "sms"
+      ]
+     }
+    },
+    "count": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-NF-04",
+   "section": "events",
+   "key": "NF-04",
+   "requirement_refs": [
+    "NF-04"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "NF-04",
+    "from": "EV_PACKET_RECEIVED",
+    "to": "EV_IDENTITY_ACTIVATED",
+    "expect_s": {
+     "$lte": 86400
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-EVENTS-NF-05",
+   "section": "events",
+   "key": "NF-05",
+   "requirement_refs": [
+    "NF-05"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 55,
+     "lane": "Messaging gateway",
+     "activity": "Send NIN by SMS and email in chosen language within min of issuance"
+    }
+   ],
+   "expect": {
+    "id": "NF-05",
+    "from": "EV_IDENTITY_ACTIVATED",
+    "to": "EV_NOTIFICATION_SENT",
+    "expect_s": {
+     "$lte": 900
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-M1",
+   "section": "metrics",
+   "key": "M1",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "M1",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/regproc-pkr\", http_route=~\".*registrationpackets\", http_request_method=\"POST\", http_response_status_code=\"200\"})",
+    "delta": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-M2",
+   "section": "metrics",
+   "key": "M2",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "M2",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/idgenerator\", http_route=~\".*/uin\", http_request_method=\"GET\", http_response_status_code=\"200\"})",
+    "delta": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-M3",
+   "section": "metrics",
+   "key": "M3",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "M3",
+    "promql": "sum(http_server_request_duration_seconds_count{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", job=\"mosip/idrepo-identity\", http_request_method=\"POST\", http_response_status_code=\"200\"})",
+    "delta": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-M4",
+   "section": "metrics",
+   "key": "M4",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "M4",
+    "promql": "sum(traces_span_metrics_calls_total{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", service_name=\"auditmanager\", span_kind=\"SPAN_KIND_SERVER\", status_code!=\"STATUS_CODE_ERROR\"})",
+    "delta": {
+     "$gte": 10
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-M5",
+   "section": "metrics",
+   "key": "M5",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "M5",
+    "promql": "sum(traces_span_metrics_calls_total{deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", service_name=~\"regproc-.*|idrepo-.*|idgenerator|keymanager\", status_code=\"STATUS_CODE_ERROR\"})",
+    "delta": 0
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-ENV1",
+   "section": "metrics",
+   "key": "ENV1",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "ENV1",
+    "promql": "count(http_server_request_duration_seconds_count{job=\"mosip/regproc-pkr\", deployment_environment_name=\"${env.name}\", cloud_region=\"${env.site}\", k8s_cluster_name=\"${env.cluster}\"})",
+    "expect": {
+     "$gte": 1
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-ENV2",
+   "section": "metrics",
+   "key": "ENV2",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "ENV2",
+    "promql": "count(target_info{deployment_environment_name=\"${env.name}\", service_namespace=\"mosip\", cloud_region!=\"${env.site}\"}) or vector(0)",
+    "expect": 0
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-X1",
+   "section": "metrics",
+   "key": "X1",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "id": "X1",
+    "api": "GET /prometheus/api/v1/query_exemplars?query=http_server_request_duration_seconds_bucket{job=\"regproc-pkr\"}&start=${t0}&end=${t_end}",
+    "expect": "at least one exemplar with labels.trace_id == ${trace.root}"
+   }
+  },
+  {
+   "obligation_id": "OBL-AUDIT-app_audit_log",
+   "section": "audit",
+   "key": "app_audit_log",
+   "requirement_refs": [
+    "F-05",
+    "F-06",
+    "F-10",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 33,
+     "lane": "ABIS",
+     "activity": "Demographic and biometric deduplication"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 36,
+     "lane": "Adjudicator",
+     "activity": "Manual adjudication"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 39,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject; no NIN consumed"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "sql": "SELECT event_id, event_name, event_type, app_id, app_name, module_id, module_name, ref_id, ref_id_type, host_name, action_dtimes FROM mosip_audit.app_audit_log WHERE ref_id IN ('${rid}', '${uin_hash}') AND action_dtimes BETWEEN '${t0}' AND '${t_end}' ORDER BY action_dtimes\n",
+    "every_row": {
+     "event_id": {
+      "$re": "^[A-Z]{3}_[0-9]{3}$"
+     },
+     "event_type": {
+      "$in": [
+       "BUSINESS",
+       "SYSTEM"
+      ]
+     },
+     "ref_id_type": {
+      "$in": [
+       "REGISTRATION_ID",
+       "UIN_HASH",
+       "RID"
+      ]
+     },
+     "host_name": {
+      "$exists": true
+     }
+    },
+    "expected_modules_ordered_subsequence": [
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "B3",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "C1",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "C4",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "C5",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "C6",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "D1",
+      "ref_id": {
+       "$ref": "rid"
+      }
+     },
+     {
+      "module_name": {
+       "$golden": true
+      },
+      "step": "D2",
+      "ref_id": {
+       "$ref": "uin_hash"
+      }
+     }
+    ],
+    "no_failure_events": "event_name not matching (?i).*(FAIL|EXCEPTION|ERROR).*",
+    "loki_audit_tenant": {
+     "logql": "{stream=\"mosip-audit\"} | json | ref_id=~\"${rid}|${uin_hash}\"",
+     "expect": "same multiset of (event_id, module_id, ref_id) as the SQL result"
+    },
+    "trace_link": {
+     "expect": "every audit row has a matching AUDIT_SERVER span (same host, |time delta| < 2 s)"
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-NFR-e2e_upload_to_processed_s",
+   "section": "nfr",
+   "key": "e2e_upload_to_processed_s",
+   "requirement_refs": [
+    "NF-01",
+    "NF-04",
+    "NF-06"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "$lte": 600
+   }
+  },
+  {
+   "obligation_id": "OBL-NFR-span_budgets_ms",
+   "section": "nfr",
+   "key": "span_budgets_ms",
+   "requirement_refs": [
+    "NF-01",
+    "NF-06"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    }
+   ],
+   "expect": {
+    "PKR_SERVER": {
+     "$lte": 5000
+    },
+    "UPLOADER_PROCESS": {
+     "$lte": 30000
+    },
+    "IDREPO_CREATE_SERVER": {
+     "$lte": 3000
+    },
+    "IDGEN_GET_SERVER": {
+     "$lte": 500
+    }
+   }
+  },
+  {
+   "obligation_id": "OBL-NFR-infra_window_checks",
+   "section": "nfr",
+   "key": "infra_window_checks",
+   "requirement_refs": [
+    "NF-01",
+    "NF-06"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    }
+   ],
+   "expect": [
+    {
+     "promql": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"regproc|idrepo|kernel|keymanager|ida\"}[${window}]))",
+     "expect": 0
+    },
+    {
+     "promql": "max_over_time(kafka_consumergroup_lag{consumergroup=~\"regproc.*\"}[${window}])",
+     "expect": "back to 0 at t_end"
+    }
+   ]
+  },
+  {
+   "obligation_id": "OBL-NFR-security",
+   "section": "nfr",
+   "key": "security",
+   "requirement_refs": [
+    "NF-01",
+    "NF-06",
+    "NF-07"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 15,
+     "lane": "Enrolment station (officer)",
+     "activity": "Supervisor approval; print RID slip session <= min"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "NFR-SEC-01": "logs.forbidden[1] and no span attribute value equal to ${uin}, ${vid}"
+   }
+  }
+ ]
+}

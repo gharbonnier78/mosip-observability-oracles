@@ -3,12 +3,14 @@ name: OAEF V5 S1 and backend evidence regression
 on:
   pull_request:
     paths:
-      - 'validation/v5_demo.py'
-      - 'validation/v5_backend.py'
-      - 'validation/v5_report.py'
-      - 'tests/test_v5_slice.py'
-      - 'tests/test_v5_backend.py'
-      - 'contracts/NIN-001-v5-slice.json'
+      - 'validation/**'
+      - 'tests/**'
+      - 'contracts/**'
+      - 'oracles/**'
+      - 'models/**'
+      - 'tools/**'
+      - 'generated/**'
+      - 'requirements-compiler.txt'
       - '.github/workflows/oaef-v5-s1.yml'
   workflow_dispatch:
 
@@ -24,7 +26,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Test nominal counts and mutation detection
+      - name: Install the spec compiler dependency (pinned, hash-checked)
+        run: python3 -m pip install --require-hashes -r requirements-compiler.txt
+      - name: Generated contracts match the specification (no drift)
+        run: python3 tools/oaef_compile.py --check
+      - name: Test nominal counts, mutation detection, regression baseline and compiler
         run: python3 -m unittest discover -s tests -v
       - name: Produce a nominal and intentionally failing sample
         shell: bash

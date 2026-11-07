@@ -1,0 +1,225 @@
+{
+ "requirements": [
+  {
+   "requirement": "F-01",
+   "text": "Demographics and documents validated against ID schema and reference data",
+   "scenarios": "NIN-001, NIN-026, NIN-027",
+   "oracle_sections": [
+    "api",
+    "db",
+    "rules"
+   ],
+   "obligations": 8,
+   "covered": true
+  },
+  {
+   "requirement": "F-02",
+   "text": "10 fingers, 2 irises, face; quality check; exception path",
+   "scenarios": "NIN-001, NIN-002, NIN-029",
+   "oracle_sections": [
+    "api.idrepo_read.checks"
+   ],
+   "obligations": 1,
+   "covered": true
+  },
+  {
+   "requirement": "F-03",
+   "text": "Supervisor approval; RID slip issued",
+   "scenarios": "NIN-001, NIN-028",
+   "oracle_sections": [
+    "rules.rid"
+   ],
+   "obligations": 3,
+   "covered": true
+  },
+  {
+   "requirement": "F-04",
+   "text": "Packet integrity, CMD/operator validity, schema conformance; reject with reason",
+   "scenarios": "NIN-020…027",
+   "oracle_sections": [
+    "db.regprc_transactions"
+   ],
+   "obligations": 14,
+   "covered": true
+  },
+  {
+   "requirement": "F-05",
+   "text": "Demographic and biometric deduplication via ABIS",
+   "scenarios": "NIN-001, NIN-010…014",
+   "oracle_sections": [
+    "traces",
+    "audit"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "F-06",
+   "text": "Possible match → manual adjudication; no NIN until resolved",
+   "scenarios": "NIN-010, NIN-011, NIN-012",
+   "oracle_sections": [
+    "db",
+    "audit"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "F-07",
+   "text": "Exactly one NIN (11 digits, check digit **[A]**) and one perpetual VID",
+   "scenarios": "NIN-001",
+   "oracle_sections": [
+    "rules.uin",
+    "rules.vid",
+    "db.idrepo_and_kernel"
+   ],
+   "obligations": 9,
+   "covered": true
+  },
+  {
+   "requirement": "F-08",
+   "text": "Identity activated; credential issued to verification partners",
+   "scenarios": "NIN-001, NIN-056",
+   "oracle_sections": [
+    "db"
+   ],
+   "obligations": 11,
+   "covered": true
+  },
+  {
+   "requirement": "F-09",
+   "text": "Notification by SMS and email in chosen language",
+   "scenarios": "NIN-001, NIN-004, NIN-074",
+   "oracle_sections": [
+    "notification"
+   ],
+   "obligations": 2,
+   "covered": true
+  },
+  {
+   "requirement": "F-10",
+   "text": "Immutable audit event per business step, linked to RID / NIN hash",
+   "scenarios": "all",
+   "oracle_sections": [
+    "audit"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "F-11",
+   "text": "Relying party verifies NIN or VID",
+   "scenarios": "NIN-050…055",
+   "oracle_sections": [],
+   "obligations": 0,
+   "covered": false
+  },
+  {
+   "requirement": "F-12",
+   "text": "Child under five enrolled with introducer",
+   "scenarios": "NIN-003",
+   "oracle_sections": [],
+   "obligations": 0,
+   "covered": false
+  },
+  {
+   "requirement": "NF-01",
+   "text": "Station session ≤ `[15]` min (adult, no exception) **[A]**",
+   "scenarios": "NIN-001 (station timing)",
+   "oracle_sections": [
+    "nfr"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "NF-02",
+   "text": "≤ 3 capture retries per modality **[A]**",
+   "scenarios": "NIN-002, NIN-029",
+   "oracle_sections": [],
+   "obligations": 0,
+   "covered": false
+  },
+  {
+   "requirement": "NF-03",
+   "text": "Offline ≥ `[72]` h, no loss, automatic sync **[A]**",
+   "scenarios": "NIN-070, offline variant of NIN-001",
+   "oracle_sections": [
+    "traces",
+    "db"
+   ],
+   "obligations": 3,
+   "covered": true
+  },
+  {
+   "requirement": "NF-04",
+   "text": "Upload → NIN ≤ `[24]` h (no hit, normal load) **[A]**",
+   "scenarios": "NIN-001",
+   "oracle_sections": [
+    "nfr.e2e_upload_to_processed_s"
+   ],
+   "obligations": 3,
+   "covered": true
+  },
+  {
+   "requirement": "NF-05",
+   "text": "Notification ≤ `[15]` min after issuance **[A]**",
+   "scenarios": "NIN-001",
+   "oracle_sections": [
+    "notification"
+   ],
+   "obligations": 2,
+   "covered": true
+  },
+  {
+   "requirement": "NF-06",
+   "text": "DR: RPO ≤ `[15]` min, RTO ≤ `[4]` h **[A]**",
+   "scenarios": "NIN-080…082",
+   "oracle_sections": [
+    "traces",
+    "nfr"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "NF-07",
+   "text": "No PII or identifier in clear in signals; audit immutable and access-controlled (NDPA 2023)",
+   "scenarios": "all",
+   "oracle_sections": [
+    "logs.forbidden",
+    "nfr.security"
+   ],
+   "obligations": 4,
+   "covered": true
+  },
+  {
+   "requirement": "NF-08",
+   "text": "Signal contract 100 %, every signal tagged with environment and site",
+   "scenarios": "all, NIN-090…093",
+   "oracle_sections": [
+    "traces",
+    "logs",
+    "metrics",
+    "audit"
+   ],
+   "obligations": 34,
+   "covered": true
+  },
+  {
+   "requirement": "NF-09",
+   "text": "Languages: English, Hausa, Yoruba, Igbo **[A]**",
+   "scenarios": "NIN-004",
+   "oracle_sections": [
+    "notification"
+   ],
+   "obligations": 1,
+   "covered": true
+  }
+ ],
+ "uncovered": [
+  "F-11",
+  "F-12",
+  "NF-02"
+ ]
+}
