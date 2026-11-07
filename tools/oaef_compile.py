@@ -35,6 +35,11 @@ class SpecError(Exception):
     pass
 
 
+def text_hash(path):
+    """SHA-256 of a text file with normalised line endings (same on Windows CRLF checkouts and Linux)."""
+    return hashlib.sha256(path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+
+
 def read_requirements():
     """{req_id: {'text', 'scenarios', 'sections': [section paths]}} from the markdown traceability table."""
     out = {}
@@ -197,9 +202,8 @@ def compile_spec(scenario, rel, requirements, activities):
         'schema': 'oaef.contract/v3',
         'scenario': scenario,
         'generated_by': 'tools/oaef_compile.py',
-        'sources': {rel: hashlib.sha256(raw).hexdigest(),
-                    REQUIREMENTS: hashlib.sha256((ROOT / REQUIREMENTS).read_bytes()).hexdigest(),
-                    ACTIVITY: hashlib.sha256((ROOT / ACTIVITY).read_bytes()).hexdigest()},
+        'sources': {rel: text_hash(src), REQUIREMENTS: text_hash(ROOT / REQUIREMENTS),
+                    ACTIVITY: text_hash(ROOT / ACTIVITY)},
         'metadata': spec.get('metadata', {}),
         'settle': spec['settle'],
         'variables': sorted(variables(spec, set())),
