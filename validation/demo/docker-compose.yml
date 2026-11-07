@@ -1,10 +1,10 @@
 # OAEF live demo stack: OpenTelemetry Collector + Tempo + Loki + Prometheus + Grafana in one container.
 # Image: grafana/otel-lgtm (demo / development use only, not for production).
-# Pin a version you have rehearsed with:  LGTM_VERSION=<tag> docker compose up -d
+# Pinned to the image digest of the 2026-11-07 live run (Grafana 13.2.3). Override: LGTM_IMAGE=grafana/otel-lgtm:<tag>
 # Start it with validation/demo/start_stack.sh (sets the public URLs used by the Grafana links).
 services:
   lgtm:
-    image: grafana/otel-lgtm:${LGTM_VERSION:-latest}
+    image: ${LGTM_IMAGE:-grafana/otel-lgtm@sha256:57b5ab1ca6619beb180174e2fccce04762470750669d043f544b4726d0582d07}
     container_name: oaef-lgtm
     ports:
       - "127.0.0.1:3000:3000"   # Grafana        (bound to localhost; Codespaces forwards it privately)

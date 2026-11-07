@@ -65,7 +65,7 @@ python3 validation/v5_backend.py re-evaluate --out /tmp/oaef-v5-duplicate
 ### Examine in Grafana
 
 - Open forwarded **private** port 3000. Grafana → Explore → Tempo → choose one `traceId` from the S1 emitted JSON; inspect its three-span trace.
-- Loki → `{service_name="oaef-s1-simulator"} |= "<actual run_id>"`; filter `transaction_id="TX-017"` in the JSON body, check duplicate business event.
+- Loki → `{service_name=~"idrepo-identity|regproc-pkr"} |= "<actual run_id>" | json | transaction_id="TX-017"`; check the duplicate business event. (Since `e7531ec` the simulator emits from the MOSIP service names; the run script and `report.html` print these links ready to click, see `OAEF-V5-LIVE-DEMO-RUNBOOK.md`.)
 - Prometheus → `{__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="<actual run_id>"}`; query only within the short-lived demo. The histogram count is not an independent business record count.
 - Compare the visible records with `backend-verdict.json`, `collected-verdict.json` and `backend-raw/`. **Grafana's display is not the oracle.**
 
