@@ -52,4 +52,5 @@ echo "== summary"
 echo "spans in trace      : $N_SPANS (expected 7)"
 echo "pkr log records     : $N_LOGS (expected >= 1)"
 echo "exemplar -> trace   : $EX_MATCH (expected >= 1)"
-if [ "$N_SPANS" -ge 7 ] && [ "$N_LOGS" -ge 1 ] && [ "$EX_MATCH" -ge 1 ]; then echo "RESULT: PASS"; else echo "RESULT: CHECK (see details above)"; fi
+# S0 smoke only (connectivity), not a scenario oracle; a failing smoke must exit nonzero.
+if [ "$N_SPANS" -ge 7 ] && [ "$N_LOGS" -ge 1 ] && [ "$EX_MATCH" -ge 1 ]; then echo "RESULT: PASS"; else echo "RESULT: FAIL (see details above)"; exit 1; fi

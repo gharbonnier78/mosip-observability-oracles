@@ -10,6 +10,8 @@ The bundle contains emitted, collected and query provenance as DIFFERENT sources
 Use OAEF_GRAFANA_USER / OAEF_GRAFANA_PASSWORD or OAEF_GRAFANA_TOKEN for auth.
 """
 import argparse
+import base64
+import binascii
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
@@ -87,6 +89,18 @@ class Grafana:
         return self.get('/api/datasources/proxy/uid/' + uid + endpoint, params)
 
 
+def hex_id(value, width):
+    """Tempo's JSON API returns OTLP bytes fields base64-encoded; OTLP/JSON input uses hex."""
+    value = value or ''
+    if re.fullmatch('[0-9a-fA-F]{%d}' % width, value):
+        return value.lower()
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return value
+    return raw.hex() if len(raw) * 2 == width else value
+
+
 def flatten_traces(trace_docs):
     spans = []
     for trace_id, doc in trace_docs.items():
@@ -98,7 +112,11 @@ def flatten_traces(trace_docs):
         for group in groups:
             for scope in group.get('scopeSpans', []):
                 for span in scope.get('spans', []):
-                    if span.get('traceId', '').lower() != trace_id.lower():
+                    span = dict(span, traceId=hex_id(span.get('traceId'), 32),
+                                spanId=hex_id(span.get('spanId'), 16))
+                    if span.get('parentSpanId'):
+                        span['parentSpanId'] = hex_id(span['parentSpanId'], 16)
+                    if span['traceId'] != trace_id.lower():
                         raise BackendProblem('Tempo trace result contained another trace ID')
                     spans.append(span)
     return {'resourceSpans': [{'resource': {'attributes': attrs({'service.name': 'oaef-s1-simulator'})},
@@ -162,7 +180,9 @@ def classify(base_verdict, trace_count, expected_count, log_count, expected_logs
              backend_errors, bad_logs, truncated, metrics_checks):
     failures = base_verdict['failures']
     hard_fail = bool(bad_logs) or any(
-        f['check_id'] in ('EVENT-EFFECT-VALUE', 'EVENT-TRACE-CORRELATION', 'EVENT-PARTIAL-ORDER') or
+        # NFR-DEMO-LATENCY is a proven violation of a declared threshold, not an evidence gap.
+        f['check_id'] in ('EVENT-EFFECT-VALUE', 'EVENT-TRACE-CORRELATION', 'EVENT-PARTIAL-ORDER',
+                          'NFR-DEMO-LATENCY') or
         (f['check_id'].startswith('EVENT-EXACT-') and f['actual'] > f['expected']) or
         (f['check_id'] in ('SPAN-EVENT-COUNT', 'SPAN-TX-COUNT', 'RUN-EVENT-COUNT', 'RUN-SPAN-COUNT')
             and f['actual'] > f['expected']) or

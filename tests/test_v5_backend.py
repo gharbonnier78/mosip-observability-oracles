@@ -2,6 +2,7 @@
 
 The fake backend establishes parser/oracle sensitivity, NOT real LGTM integration.
 """
+import base64
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,10 +19,11 @@ BACKEND = ROOT / 'validation/v5_backend.py'
 
 
 class MemoryGrafana:
-    def __init__(self, posted, drop_event=False, metric_missing=False):
+    def __init__(self, posted, drop_event=False, metric_missing=False, tempo_base64=False):
         self.posted = posted
         self.drop_event = drop_event
         self.metric_missing = metric_missing
+        self.tempo_base64 = tempo_base64
         self.paths = []
 
     def query(self, path, query):
@@ -33,6 +35,10 @@ class MemoryGrafana:
             wanted = path.removeprefix(prefix)
             src = self.posted['/v1/traces']['resourceSpans'][0]
             spans = [s for s in src['scopeSpans'][0]['spans'] if s['traceId'] == wanted]
+            if self.tempo_base64:  # real Tempo JSON encodes OTLP bytes fields as base64
+                b64 = lambda h: base64.b64encode(bytes.fromhex(h)).decode()
+                spans = [dict(s, **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)})
+                         for s in spans]
             return (200, {'resourceSpans': [{'resource': src['resource'],
                          'scopeSpans': [{'spans': spans}]}]}) if spans else (404, {})
         if path == '/api/datasources/proxy/uid/loki-demo/loki/api/v1/query_range':
@@ -73,7 +79,7 @@ class MemoryGrafana:
 
 
 class V5BackendTest(unittest.TestCase):
-    def run_sample(self, fault='none', drop_event=False, metric_missing=False, count=3):
+    def run_sample(self, fault='none', drop_event=False, metric_missing=False, count=3, tempo_base64=False):
         work = tempfile.TemporaryDirectory()
         self.addCleanup(work.cleanup)
         root = Path(work.name)
@@ -111,7 +117,8 @@ class V5BackendTest(unittest.TestCase):
                '--target', '2', '--fault', fault, '--out', str(out), '--otlp', url]
         run = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         self.assertEqual(set(posted), {'/v1/traces', '/v1/logs', '/v1/metrics'})
-        backend = MemoryGrafana(posted, drop_event=drop_event, metric_missing=metric_missing)
+        backend = MemoryGrafana(posted, drop_event=drop_event, metric_missing=metric_missing,
+                                tempo_base64=tempo_base64)
         result = subprocess.run([sys.executable, str(BACKEND), 'collect', '--out', str(out),
                                  '--grafana', url, '--timeout', '0', '--poll', '0.01'],
                                 capture_output=True, text=True, timeout=30)
@@ -175,6 +182,19 @@ class V5BackendTest(unittest.TestCase):
         self.assertEqual(v['status'], 'FAIL')
         self.assertIn('PROM-MEASUREMENTS-COUNT',
                       {x['check_id'] for x in v['metric_checks'] if x['status'] == 'FAIL'})
+
+    def test_tempo_base64_ids(self):
+        _, run, proc, v, _ = self.run_sample(tempo_base64=True)
+        self.assertEqual((run.returncode, proc.returncode), (0, 0), proc.stdout + proc.stderr)
+        self.assertEqual(v['status'], 'PASS')
+        self.assertEqual(v['trace_count'], 3)
+
+    def test_latency_breach_is_fail_not_inconclusive(self):
+        _, run, proc, v, _ = self.run_sample(fault='slow')
+        self.assertEqual(run.returncode, 1)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertEqual(v['status'], 'FAIL')
+        self.assertIn('NFR-DEMO-LATENCY', {x['check_id'] for x in v['event_span_failures']})
 
 
 if __name__ == '__main__':
