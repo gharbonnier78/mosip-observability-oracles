@@ -125,7 +125,7 @@
       },
       "targets": [
         {
-          "expr": "sum(oaef_synthetic_journey_duration_seconds_count{oaef_run_id=\"$run_id\"})",
+          "expr": "sum(last_over_time(oaef_synthetic_journey_duration_seconds_count{oaef_run_id=\"$run_id\"}[$__range]))",
           "instant": true,
           "refId": "A",
           "datasource": {
@@ -187,7 +187,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (service_name) (http_server_request_duration_seconds_count{oaef_run_id=\"$run_id\", service_name=~\"$service\"})",
+          "expr": "sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{oaef_run_id=\"$run_id\", service_name=~\"$service\"}[$__range]))",
           "instant": true,
           "legendFormat": "{{service_name}}",
           "refId": "A",
@@ -218,7 +218,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (service_name) (http_server_request_duration_seconds_sum{oaef_run_id=\"$run_id\", service_name=~\"$service\"}) / sum by (service_name) (http_server_request_duration_seconds_count{oaef_run_id=\"$run_id\", service_name=~\"$service\"})",
+          "expr": "sum by (service_name) (last_over_time(http_server_request_duration_seconds_sum{oaef_run_id=\"$run_id\", service_name=~\"$service\"}[$__range])) / sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{oaef_run_id=\"$run_id\", service_name=~\"$service\"}[$__range]))",
           "instant": true,
           "legendFormat": "{{service_name}}",
           "refId": "A",

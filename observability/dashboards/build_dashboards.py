@@ -3,6 +3,8 @@
 
   python3 observability/dashboards/build_dashboards.py      -> oaef-test-runs.json, oaef-journey.json
 
+Run-scoped metrics are one sample per run: panels read them with last_over_time(...[$__range]) so a run stays
+visible for the whole dashboard range (a plain instant query only looks back 5 minutes).
 Reusable outside MOSIP: data sources are dashboard variables (any Prometheus/Loki/Tempo), and the only
 conventions assumed are the OAEF ones: verdict events `oaef.test.verdict` from service `oaef-jarvis`,
 `oaef.run.id` on spans/logs/run-scoped metrics, OTel semantic-convention HTTP metrics, Tempo span metrics.
@@ -92,18 +94,18 @@ journey = dashboard(
         panel(1, 'nodeGraph', 'Service graph (Tempo, all runs in the time range)', 0, 0, 12, 10, TEMPO,
               [{'queryType': 'serviceMap'}]),
         panel(2, 'stat', 'Transactions in this run', 12, 0, 4, 5, PROM,
-              [{'expr': f'sum(oaef_synthetic_journey_duration_seconds_count{{{RUN}}})', 'instant': True}]),
+              [{'expr': f'sum(last_over_time(oaef_synthetic_journey_duration_seconds_count{{{RUN}}}[$__range]))', 'instant': True}]),
         panel(3, 'stat', 'Verdict of this run', 16, 0, 8, 5, LOKI,
               [{'expr': f'sum by (status) (count_over_time({{service_name="oaef-jarvis"}} |= "$run_id" | json status [$__range]))',
                 'queryType': 'instant', 'legendFormat': '{{status}}'}],
               options={'reduceOptions': {'calcs': ['lastNotNull']}, 'textMode': 'name', 'colorMode': 'background'}),
         panel(4, 'bargauge', 'Requests per service (this run)', 12, 5, 6, 5, PROM,
-              [{'expr': f'sum by (service_name) (http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}})',
+              [{'expr': f'sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}}[$__range]))',
                 'instant': True, 'legendFormat': '{{service_name}}'}],
               options={'orientation': 'horizontal', 'displayMode': 'basic'}),
         panel(5, 'bargauge', 'Mean server latency per service (this run)', 18, 5, 6, 5, PROM,
-              [{'expr': f'sum by (service_name) (http_server_request_duration_seconds_sum{{{RUN}, service_name=~"$service"}}) / '
-                        f'sum by (service_name) (http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}})',
+              [{'expr': f'sum by (service_name) (last_over_time(http_server_request_duration_seconds_sum{{{RUN}, service_name=~"$service"}}[$__range])) / '
+                        f'sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}}[$__range]))',
                 'instant': True, 'legendFormat': '{{service_name}}'}],
               options={'orientation': 'horizontal', 'displayMode': 'basic'},
               fieldConfig={'defaults': {'unit': 's'}, 'overrides': []}),
