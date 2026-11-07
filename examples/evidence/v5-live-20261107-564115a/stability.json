@@ -1,0 +1,189 @@
+[
+  {
+    "case": "broken_link",
+    "repeats": 1,
+    "stability": "SINGLE RUN",
+    "interpretation": "repeat with OAEF_REPEAT=N to assess stability",
+    "timing_sensitive": false,
+    "runs": [
+      {
+        "dir": "broken_link",
+        "case": "broken_link",
+        "run_id": "s1-5d8258cfd9c0",
+        "fault": "broken_link",
+        "status": "FAIL",
+        "classes": [
+          "TRACE_CONTEXT_BROKEN"
+        ],
+        "signature": [
+          "SPAN-PARENT-idrepo-server@TX-017"
+        ],
+        "attempts": 1,
+        "collect_s": 1.04,
+        "report": "broken_link/report.html"
+      }
+    ]
+  },
+  {
+    "case": "duplicate",
+    "repeats": 3,
+    "stability": "STABLE",
+    "interpretation": "reproducible",
+    "timing_sensitive": false,
+    "runs": [
+      {
+        "dir": "duplicate",
+        "case": "duplicate",
+        "run_id": "s1-a6438d48eddf",
+        "fault": "duplicate",
+        "status": "FAIL",
+        "classes": [
+          "OBSERVABILITY_VIOLATION"
+        ],
+        "signature": [
+          "EVENT-EXACT-mosip.identity.uin.assigned@TX-017",
+          "RUN-EVENT-COUNT@run"
+        ],
+        "attempts": 1,
+        "collect_s": 19.19,
+        "report": "duplicate/report.html"
+      },
+      {
+        "dir": "duplicate-r1",
+        "case": "duplicate",
+        "run_id": "s1-45ba4bc35039",
+        "fault": "duplicate",
+        "status": "FAIL",
+        "classes": [
+          "OBSERVABILITY_VIOLATION"
+        ],
+        "signature": [
+          "EVENT-EXACT-mosip.identity.uin.assigned@TX-017",
+          "RUN-EVENT-COUNT@run"
+        ],
+        "attempts": 1,
+        "collect_s": 1.03,
+        "report": "duplicate-r1/report.html"
+      },
+      {
+        "dir": "duplicate-r2",
+        "case": "duplicate",
+        "run_id": "s1-72b1b88b2bf1",
+        "fault": "duplicate",
+        "status": "FAIL",
+        "classes": [
+          "OBSERVABILITY_VIOLATION"
+        ],
+        "signature": [
+          "EVENT-EXACT-mosip.identity.uin.assigned@TX-017",
+          "RUN-EVENT-COUNT@run"
+        ],
+        "attempts": 1,
+        "collect_s": 1.14,
+        "report": "duplicate-r2/report.html"
+      }
+    ]
+  },
+  {
+    "case": "missing_metric",
+    "repeats": 1,
+    "stability": "SINGLE RUN",
+    "interpretation": "repeat with OAEF_REPEAT=N to assess stability",
+    "timing_sensitive": true,
+    "runs": [
+      {
+        "dir": "missing_metric",
+        "case": "missing_metric",
+        "run_id": "s1-63e6b912f564",
+        "fault": "missing_metric",
+        "status": "INCONCLUSIVE",
+        "classes": [
+          "EVIDENCE_GAP"
+        ],
+        "signature": [
+          "METRIC-SVC-COUNT-idgenerator@run",
+          "METRIC-SVC-SUM-idgenerator@run"
+        ],
+        "attempts": 21,
+        "collect_s": 90.19,
+        "report": "missing_metric/report.html"
+      }
+    ]
+  },
+  {
+    "case": "nominal",
+    "repeats": 3,
+    "stability": "STABLE",
+    "interpretation": "reproducible",
+    "timing_sensitive": false,
+    "runs": [
+      {
+        "dir": "nominal",
+        "case": "nominal",
+        "run_id": "s1-3855d0abffdd",
+        "fault": "none",
+        "status": "PASS",
+        "classes": [
+          "S1_TELEMETRY_CONFORMANT"
+        ],
+        "signature": [],
+        "attempts": 1,
+        "collect_s": 46.01,
+        "report": "nominal/report.html"
+      },
+      {
+        "dir": "nominal-r1",
+        "case": "nominal",
+        "run_id": "s1-eb291ebea680",
+        "fault": "none",
+        "status": "PASS",
+        "classes": [
+          "S1_TELEMETRY_CONFORMANT"
+        ],
+        "signature": [],
+        "attempts": 1,
+        "collect_s": 1.0,
+        "report": "nominal-r1/report.html"
+      },
+      {
+        "dir": "nominal-r2",
+        "case": "nominal",
+        "run_id": "s1-08b64d472754",
+        "fault": "none",
+        "status": "PASS",
+        "classes": [
+          "S1_TELEMETRY_CONFORMANT"
+        ],
+        "signature": [],
+        "attempts": 1,
+        "collect_s": 1.19,
+        "report": "nominal-r2/report.html"
+      }
+    ]
+  },
+  {
+    "case": "slow",
+    "repeats": 1,
+    "stability": "SINGLE RUN",
+    "interpretation": "repeat with OAEF_REPEAT=N to assess stability",
+    "timing_sensitive": false,
+    "runs": [
+      {
+        "dir": "slow",
+        "case": "slow",
+        "run_id": "s1-974a85c37a1a",
+        "fault": "slow",
+        "status": "FAIL",
+        "classes": [
+          "NFR_VIOLATION"
+        ],
+        "signature": [
+          "NFR-DEMO-LATENCY@TX-017"
+        ],
+        "attempts": 1,
+        "collect_s": 1.1,
+        "report": "slow/report.html"
+      }
+    ]
+  }
+]

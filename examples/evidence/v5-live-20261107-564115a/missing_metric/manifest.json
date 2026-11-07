@@ -1,0 +1,33 @@
+{
+  "contract_sha256": "ce931cab1defc3986d94bf04f900d3dafe3a06b53529dd217d08e869ff9bbdb2",
+  "contract_snapshot_sha256": "87b907ff49433404721279348fb16e0162f5f97e3a4a7a5f8bdc7da0fad3f74f",
+  "emitted": [
+    {
+      "bytes": 1260290,
+      "http_status": 200,
+      "signal": "traces",
+      "url": "http://localhost:4318/v1/traces"
+    },
+    {
+      "bytes": 255482,
+      "http_status": 200,
+      "signal": "logs",
+      "url": "http://localhost:4318/v1/logs"
+    },
+    {
+      "bytes": 5565,
+      "http_status": 200,
+      "signal": "metrics",
+      "url": "http://localhost:4318/v1/metrics"
+    }
+  ],
+  "emitted_at_ns": "1794073429628056289",
+  "fault": "missing_metric",
+  "mode": "S1",
+  "otlp_status": "attempted",
+  "run_id": "s1-63e6b912f564",
+  "scope": "S1 simulated NIN-001 journey (3 required business events, 17 expected spans over 6 services), NOT full MOSIP NIN-001 conformance",
+  "seed": 20261107,
+  "target": 17,
+  "transactions": 100
+}

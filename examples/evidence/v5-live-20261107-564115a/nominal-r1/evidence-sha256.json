@@ -1,0 +1,32 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "allure-results/116952cc-1a66-50bc-8c2f-90bc5ddc15ad-backend-meta-attachment.json": "7953c598c6686149014c0779257a74d440e8e3ffbcbb0313a700817031485c98",
+    "allure-results/116952cc-1a66-50bc-8c2f-90bc5ddc15ad-backend-verdict-attachment.json": "89020b66d48d9f81bdd7ce26ea985725a55f64f64fac3da5b40dcfd936f8740d",
+    "allure-results/116952cc-1a66-50bc-8c2f-90bc5ddc15ad-result.json": "e8b33b110d974e2d3e7fa53fe7252cea097ede1b32fb212fed3a7ea37e250f99",
+    "allure-results/4f94afdc-64fa-5eaf-845a-5e122b64c277-result.json": "b3af5bb24ae885966584aa7248c30ed4ecacf7e5eb644806ebbc587d4d1ac13e",
+    "allure-results/4f94afdc-64fa-5eaf-845a-5e122b64c277-sequence-attachment.svg": "3dadc16a42e6c91b423ac85b268024b610c194e9efb9bc0084a5d4d58b6230e9",
+    "allure-results/5d9526b8-4128-5d5c-b9b3-b3ccd62c9290-attachment.html": "fbddde4cfc7cfa3dcb68f8c98416f821212a9a03deb9e6f1a3a002de1aead11a",
+    "allure-results/7449efca-6b05-5b95-8cb4-99fce4b28c3f-container.json": "277f9b1495c6aadf182dc93678d7e10226bd601b9ec10eba658f0afc6ab9e7e9",
+    "allure-results/categories.json": "d0680bae8cdc635b2c5e5f185947171aaf850a05dc0fe90eca202aff78e6de37",
+    "allure-results/environment.properties": "e6234087d75cc0ed5a47bea541672641f0c716eb0021a61fea58f84dd58dba71",
+    "backend-meta.json": "7953c598c6686149014c0779257a74d440e8e3ffbcbb0313a700817031485c98",
+    "backend-raw/loki.json": "7f9baa4f1c461b64c28ec1ca9af6af310031ef7a3f720304f644f734f9c682de",
+    "backend-raw/prometheus-services.json": "d857e27e0f495ca5f1744d31730b0b21f4af7cbb43e6e387f465f044b0f21011",
+    "backend-raw/prometheus.json": "1a67b0c9b0d37508bad2e42db924d431210c71e6238c29f1a776b8b0efe21023",
+    "backend-raw/service-graph.json": "4d3764c84c70ad0fcaa6a7fe2fcacbb9cf26f6ba82bb72baa68bb1208e87c5a3",
+    "backend-raw/tempo.json": "d6f0e47038377e6cf2aef27145f27d2ead8a34e00c28bf7f6ae47a41364d896a",
+    "backend-report.md": "25fe91d500e408f32bb2cfacd2ca9bd5316b79f6d8f1774cc8c3cfa93ba9b1ae",
+    "backend-verdict.json": "89020b66d48d9f81bdd7ce26ea985725a55f64f64fac3da5b40dcfd936f8740d",
+    "collected-otel.json": "cbc23b86c9387bf87f82e88c5e7b389955d6101b23229287ba72a8964209f06b",
+    "collected-verdict.json": "3f035ef359afcd6befbd7b294e2071f55aa030a51bf093b8038a28c382ea3458",
+    "contract.json": "87b907ff49433404721279348fb16e0162f5f97e3a4a7a5f8bdc7da0fad3f74f",
+    "ledger.json": "7840487b330dcc8d213746618c128f764986ea1be6668a6688cd27ca927f9b97",
+    "links.md": "964de794b6b3641693a33c6b16f0d0991057630400cab6201872d6545daef81e",
+    "manifest.json": "be70f8ad3b2b563dd6d12442c6dbb584d4683240cae910d9175e6c7361baf61d",
+    "observed.json": "868a51dc3c136e641304361009b70993bdfbf4f2913a95f358658efc3b03eccf",
+    "report.html": "fbddde4cfc7cfa3dcb68f8c98416f821212a9a03deb9e6f1a3a002de1aead11a",
+    "verdict.json": "d0159b321b0f7dc4ca39354a378b28c7722c3a47738c958f27e896b166698138"
+  },
+  "scope": "local integrity, NOT signature or WORM"
+}

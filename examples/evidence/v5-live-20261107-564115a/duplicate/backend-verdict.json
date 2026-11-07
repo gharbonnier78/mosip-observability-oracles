@@ -1,0 +1,189 @@
+{
+  "backend_ingestion_verified": false,
+  "backend_query_provenance": "backend-meta.json",
+  "business_sut_verified": false,
+  "classification": "OBSERVABILITY_VIOLATION",
+  "collected_artifact": "collected-otel.json",
+  "derived_metrics_health": [
+    {
+      "actual": 132.2,
+      "check_id": "GRAPH-EDGE-jarvis-e2e->regproc-pkr",
+      "expected": "present",
+      "status": "PASS"
+    },
+    {
+      "actual": 132.2,
+      "check_id": "GRAPH-EDGE-regproc-pkr->regproc-group1",
+      "expected": "present",
+      "status": "PASS"
+    },
+    {
+      "actual": 132.2,
+      "check_id": "GRAPH-EDGE-regproc-group1->idgenerator",
+      "expected": "present",
+      "status": "PASS"
+    },
+    {
+      "actual": 132.2,
+      "check_id": "GRAPH-EDGE-regproc-group1->idrepo-identity",
+      "expected": "present",
+      "status": "PASS"
+    },
+    {
+      "actual": 132.2,
+      "check_id": "GRAPH-EDGE-regproc-group1->kernel-notification",
+      "expected": "present",
+      "status": "PASS"
+    }
+  ],
+  "diagnostic_classes": [
+    "OBSERVABILITY_VIOLATION"
+  ],
+  "event_span_failures": [
+    {
+      "actual": 301,
+      "check_id": "RUN-EVENT-COUNT",
+      "expected": 300,
+      "status": "FAIL",
+      "transaction_id": null
+    },
+    {
+      "actual": 2,
+      "check_id": "EVENT-EXACT-mosip.identity.uin.assigned",
+      "expected": 1,
+      "ref": "mosip.identity.uin.assigned",
+      "status": "FAIL",
+      "transaction_id": "TX-017"
+    }
+  ],
+  "events_collected": 301,
+  "events_expected": 300,
+  "evidence_sufficiency": "SUFFICIENT_FOR_S1",
+  "metric_checks": [
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-COUNT-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-SUM-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-MEASUREMENTS-COUNT",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 12.649,
+      "check_id": "PROM-MEASUREMENTS-SUM-S",
+      "expected": 12.649,
+      "status": "PASS"
+    },
+    {
+      "actual": 26.0,
+      "check_id": "PROM-BUCKET-0.1",
+      "expected": 26,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-0.25",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-0.5",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-1",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-2",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-5",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-10",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-INF",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100,
+      "check_id": "METRIC-SVC-COUNT-regproc-pkr",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 0.5,
+      "check_id": "METRIC-SVC-SUM-regproc-pkr",
+      "expected": 0.5,
+      "status": "PASS"
+    },
+    {
+      "actual": 100,
+      "check_id": "METRIC-SVC-COUNT-idgenerator",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 0.3,
+      "check_id": "METRIC-SVC-SUM-idgenerator",
+      "expected": 0.3,
+      "status": "PASS"
+    },
+    {
+      "actual": 100,
+      "check_id": "METRIC-SVC-COUNT-idrepo-identity",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 11.749,
+      "check_id": "METRIC-SVC-SUM-idrepo-identity",
+      "expected": 11.749,
+      "status": "PASS"
+    },
+    {
+      "actual": 100,
+      "check_id": "METRIC-SVC-COUNT-kernel-notification",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 0.7,
+      "check_id": "METRIC-SVC-SUM-kernel-notification",
+      "expected": 0.7,
+      "status": "PASS"
+    }
+  ],
+  "mode": "S1_BACKEND_OBSERVATION",
+  "run_id": "s1-a6438d48eddf",
+  "status": "FAIL",
+  "trace_count": 100,
+  "transaction_count": 100
+}
