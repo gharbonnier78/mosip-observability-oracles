@@ -12,7 +12,6 @@ Index: <out>/screenshots/index.json (file, caption, url, status). Screenshots ar
 illustrate the evidence, they are not part of the sealed bundle and never change a verdict.
 """
 import argparse
-import base64
 import json
 import os
 from pathlib import Path
@@ -25,6 +24,7 @@ from v5_report import Links  # noqa: E402
 from v5_demo import av  # noqa: E402
 
 VIEW = {'width': 1600, 'height': 1000}
+BROKEN = 'failed to load its application files'
 
 
 def load(p):
@@ -90,22 +90,26 @@ def main():
     index = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        # Basic authentication on every request (Grafana auth.basic): no dependency on the login form's markup.
-        token = base64.b64encode(f'admin:{password}'.encode()).decode()
-        context = browser.new_context(viewport=VIEW, extra_http_headers={'Authorization': f'Basic {token}'})
-        page = context.new_page()
-        page.goto(f'{a.grafana}/api/user', wait_until='load')
-        if '"login":"admin"' not in page.content().replace(' ', ''):
-            print('Grafana authentication failed', file=sys.stderr)
+        # Session login through Grafana's login API (JSON, no dependency on the form's markup): the session cookie
+        # lands in the browser context. No global Authorization header (it breaks the loading of Grafana's frontend).
+        context = browser.new_context(viewport=VIEW)
+        r = context.request.post(f'{a.grafana}/login', data={'user': 'admin', 'password': password})
+        me = context.request.get(f'{a.grafana}/api/user')
+        if not r.ok or not me.ok or me.json().get('login') != 'admin':
+            print(f'Grafana authentication failed (login HTTP {r.status}, api/user HTTP {me.status})', file=sys.stderr)
             return 2
+        page = context.new_page()
         for rel, caption, url, kind in shots:
             target = out / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             status = 'ok'
             try:
                 page.goto(url, wait_until='networkidle', timeout=60000)
-                time.sleep(4 if kind == 'grafana' else 1)   # panels and trace view render after the network settles
+                time.sleep(6 if kind == 'grafana' else 1)   # panels and trace view render after the network settles
                 page.screenshot(path=str(target), full_page=(kind == 'page'))
+                text = page.inner_text('body')
+                if kind == 'grafana' and (BROKEN in text or 'Log in' in page.title() or '/login' in page.url):
+                    status = 'error: grafana page not rendered'   # never count an error page as a screenshot
             except Exception as ex:   # one failed view must not hide the others; recorded in the index
                 status = f'error: {type(ex).__name__}'
             index.append({'file': rel, 'caption': caption, 'url': url, 'status': status,
@@ -116,7 +120,7 @@ def main():
     (out / 'screenshots' / 'index.json').write_text(json.dumps(index, indent=1) + '\n', encoding='utf-8')
     ok = sum(1 for i in index if i['status'] == 'ok')
     print(f'SCREENSHOTS: {ok}/{len(index)} captured -> {out}/screenshots/index.json')
-    return 0 if ok else 1
+    return 0 if ok == len(index) else 1
 
 
 if __name__ == '__main__':
