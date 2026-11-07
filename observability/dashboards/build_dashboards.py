@@ -38,6 +38,9 @@ def dashboard(uid, title, description, variables, panels, links=()):
 
 
 VERDICTS = '{service_name="oaef-jarvis"} | json'
+VERDICT_COLORS = {'defaults': {}, 'overrides': [   # series named after the verdict get its colour
+    {'matcher': {'id': 'byName', 'options': n}, 'properties': [{'id': 'color', 'value': {'mode': 'fixed', 'fixedColor': c}}]}
+    for n, c in (('PASS', 'green'), ('FAIL', 'red'), ('INCONCLUSIVE', 'orange'))]}
 REPORT_LINK = {'matcher': {'id': 'byName', 'options': 'report_url'},
                'properties': [{'id': 'links', 'value': [{'title': 'Open the test report', 'url': '${__value.raw}',
                                                           'targetBlank': True}]}]}
@@ -54,9 +57,7 @@ test_runs = dashboard(
               [{'expr': f'sum by (status) (count_over_time({VERDICTS} [$__range]))', 'queryType': 'range',
                 'legendFormat': '{{status}}'}],
               options={'reduceOptions': {'calcs': ['lastNotNull']}, 'colorMode': 'background', 'textMode': 'value_and_name'},
-              fieldConfig={'defaults': {}, 'overrides': [
-                  {'matcher': {'id': 'byName', 'options': n}, 'properties': [{'id': 'color', 'value': {'mode': 'fixed', 'fixedColor': c}}]}
-                  for n, c in (('PASS', 'green'), ('FAIL', 'red'), ('INCONCLUSIVE', 'orange'))]}),
+              fieldConfig=VERDICT_COLORS),
         panel(2, 'piechart', 'Failures by diagnostic class', 8, 0, 8, 6, LOKI,
               [{'expr': f'sum by (cls) (count_over_time({{service_name="oaef-jarvis"}} | json status, cls="classes[0]" '
                         f'| status != "PASS" [$__range]))', 'queryType': 'range', 'legendFormat': '{{cls}}'}],
@@ -100,7 +101,8 @@ journey = dashboard(
         panel(3, 'stat', 'Verdict of this run', 16, 0, 8, 5, LOKI,
               [{'expr': f'sum by (status) (count_over_time({{service_name="oaef-jarvis"}} |= "$run_id" | json status [$__range]))',
                 'queryType': 'range', 'legendFormat': '{{status}}'}],
-              options={'reduceOptions': {'calcs': ['lastNotNull']}, 'textMode': 'name', 'colorMode': 'background'}),
+              options={'reduceOptions': {'calcs': ['lastNotNull']}, 'textMode': 'name', 'colorMode': 'background'},
+              fieldConfig=VERDICT_COLORS),
         panel(4, 'bargauge', 'Requests per service (this run)', 12, 5, 6, 5, PROM,
               [{'expr': f'sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}}[$__range]))',
                 'instant': True, 'legendFormat': '{{service_name}}'}],
