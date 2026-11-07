@@ -478,6 +478,9 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
         raise BackendProblem('One source trace per transaction required for this slice')
     emitted_records = sum(len(sc['logRecords']) for g in emitted['logs']['resourceLogs'] for sc in g['scopeLogs'])
     expected_records = emitted_records if spec else len(ledger) * len(contract['required_events'])
+    # The query limit must exceed the expected volume, or a complete answer looks truncated (and the run is
+    # INCONCLUSIVE). Capped at Loki's default max_entries_limit_per_query (5000): beyond it, pagination is needed.
+    limit = min(max(limit, expected_records + 500), 5000)
     starts = [int(s['startTimeUnixNano']) for s in source_spans]
     ends = [int(s['endTimeUnixNano']) for s in source_spans]
     start_ns = min(starts) - 10_000_000_000

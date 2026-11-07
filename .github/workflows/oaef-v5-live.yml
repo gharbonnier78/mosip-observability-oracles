@@ -37,7 +37,8 @@ jobs:
     timeout-minutes: 40
     env:
       OAEF_OUT: ${{ github.workspace }}/oaef-v5
-      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.49.1-noble   # pinned: scripted screenshots
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.49.1-noble   # pinned: browsers for the screenshots
+      PLAYWRIGHT_VERSION: '1.49.1'                                           # Python package, same version as the image
       OAEF_REPEAT: ${{ github.event.inputs.repeat || '1' }}
       OAEF_CONTRACT: ${{ github.event.inputs.contract || 'legacy' }}
     steps:
@@ -66,7 +67,7 @@ jobs:
       - name: Capture screenshots (Playwright script, pinned image)
         if: always()
         run: |
-          docker run --rm --network host --ipc host -e GF_ADMIN_PASSWORD -e OAEF_OUT=/w/oaef-v5 -v "$GITHUB_WORKSPACE:/w" -w /w "$PLAYWRIGHT_IMAGE" python3 validation/demo/capture_screens.py --out /w/oaef-v5
+          docker run --rm --network host --ipc host -e GF_ADMIN_PASSWORD -e OAEF_OUT=/w/oaef-v5 -v "$GITHUB_WORKSPACE:/w" -w /w "$PLAYWRIGHT_IMAGE" bash -c "pip install --quiet --break-system-packages playwright==$PLAYWRIGHT_VERSION && python3 validation/demo/capture_screens.py --out /w/oaef-v5"
       - name: Rebuild the offline campaign zip with screenshots and Allure
         if: always()
         run: python3 validation/v5_export.py "$OAEF_OUT"
