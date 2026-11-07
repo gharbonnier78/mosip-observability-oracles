@@ -146,7 +146,8 @@ class V5BackendTest(unittest.TestCase):
         url = f'http://127.0.0.1:{server.server_address[1]}'
         out = root / 'run'
         cmd = [sys.executable, str(S1), 'run', '--count', str(count), '--seed', '502',
-               '--target', '2', '--fault', fault, '--out', str(out), '--otlp', url]
+               '--target', '2', '--fault', fault, '--out', str(out), '--otlp', url,
+               '--contract', os.environ.get('OAEF_CONTRACT', 'legacy')]   # legacy unless a test selects spec
         run = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         self.assertEqual(set(posted), {'/v1/traces', '/v1/logs', '/v1/metrics'})
         backend = MemoryGrafana(posted, drop_event=drop_event, metric_missing=metric_missing,

@@ -473,8 +473,9 @@ def main(argv=None):
     run.add_argument('--target', type=int, default=1)
     run.add_argument('--out', type=Path, required=True)
     run.add_argument('--otlp', help='Optional OTLP/HTTP collector base URL')
-    run.add_argument('--contract', choices=['legacy', 'spec'], default=os.environ.get('OAEF_CONTRACT', 'legacy'),
-                     help='spec: compiled specification (generated/contracts); legacy: hand-written V5 slice')
+    run.add_argument('--contract', choices=['legacy', 'spec'], default=os.environ.get('OAEF_CONTRACT', 'spec'),
+                     help='spec (default): compiled specification (generated/contracts); '
+                          'legacy: hand-written V5 slice, kept for the regression baseline')
     verify_cmd = sub.add_parser('verify')
     verify_cmd.add_argument('--out', type=Path, required=True)
     args = p.parse_args(argv)

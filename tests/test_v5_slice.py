@@ -19,7 +19,7 @@ class V5SyntheticSlice(unittest.TestCase):
         out = Path(tmp.name)
         p = subprocess.run([sys.executable, str(SCRIPT), 'run', '--count', str(count),
                             '--seed', '101', '--fault', fault, '--target', str(target),
-                            '--out', str(out)], capture_output=True, text=True)
+                            '--out', str(out), '--contract', 'legacy'], capture_output=True, text=True)
         verdict = json.loads((out / 'verdict.json').read_text())
         return out, p, verdict
 
@@ -86,7 +86,7 @@ class V5SyntheticSlice(unittest.TestCase):
         self.addCleanup(server.shutdown)
         with tempfile.TemporaryDirectory() as tmp:
             p = subprocess.run([sys.executable, str(SCRIPT), 'run', '--count', '3',
-                                '--target', '1', '--seed', '310', '--out', tmp,
+                                '--target', '1', '--seed', '310', '--out', tmp, '--contract', 'legacy',
                                 '--otlp', f'http://127.0.0.1:{server.server_address[1]}'],
                                capture_output=True, text=True, timeout=15)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)

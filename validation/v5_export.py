@@ -103,6 +103,7 @@ def main(root):
               'screenshots/ and <run>/screenshots/: Grafana, Tempo, Loki, Prometheus, dashboards, reports and Allure,\n'
               '  captured by validation/demo/capture_screens.py (Playwright script, after sealing; index.json lists them).\n'
               'allure-report/: open allure-report/index.html through a web server (e.g. python3 -m http.server).\n'
+              'specification/: requirements, activity model, oracle spec (YAML), compiled contract and coverage.\n'
               'campaign-sha256.json: hash of every file of this zip.\n')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         def add(arc, data):
@@ -122,6 +123,10 @@ def main(root):
         add('xray/cucumber.json', json.dumps(cucumber, indent=1).encode())
         add('scenario/' + Path(FEATURE).name, (ROOT / FEATURE).read_bytes())
         add('scenario/NIN-001-v5-slice.json', (ROOT / 'contracts/NIN-001-v5-slice.json').read_bytes())
+        for rel in ('oracles/NIN-001.oracle.yaml', 'models/nin-requirements.md', 'models/nin-enrolment-activity.puml',
+                    'generated/contracts/NIN-001.contract.json', 'generated/coverage.json'):
+            if (ROOT / rel).exists():   # the specification sources and what the compiler made of them
+                add('specification/' + rel, (ROOT / rel).read_bytes())
         add('README.txt', readme.encode())
         z.writestr('campaign-sha256.json', json.dumps({'algorithm': 'sha256', 'files': hashes}, indent=1))
     (root / 'exports' / 'cucumber.json').write_text(json.dumps(cucumber, indent=1), encoding='utf-8')

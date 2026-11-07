@@ -1,14 +1,15 @@
 # OAEF V5 — live demo runbook (S0 → S1 → S2-read)
 
 **Status:** operating procedure for the demonstrator on branch `docs/oaef-v5-model-to-evidence-demo`.
-**Live run status:** latest run 2026-11-07 on `564115a` (Codespaces and GitHub Actions), see section 7. Earlier: commit `e7531ec`: S0 and all 7 cases behaved as expected, HTML reports and Grafana links verified in the browser. See section 7 and `examples/evidence/v5-live-20261107-e7531ec/`. Screenshots and figures shown in a presentation must come from a recorded run like this one, with its run ID.
+**Oracle:** since C1d the default contract is the **compiled specification** (`generated/contracts/NIN-001.contract.json`, built by `tools/oaef_compile.py` from `oracles/NIN-001.oracle.yaml`, `models/nin-requirements.md` and `models/nin-enrolment-activity.puml`). The hand-written V5 slice (`contracts/NIN-001-v5-slice.json`) stays available with `--contract legacy` / `OAEF_CONTRACT=legacy` and is kept in the regression baseline. Step-by-step user guide with figures: [`OAEF-V5-USER-GUIDE.md`](OAEF-V5-USER-GUIDE.md).
+**Live run status:** latest run 2026-11-07, GitHub Actions run 42420471946 on `0f9f3fc` (spec contract, all cases, 35/35 screenshots), see section 7. Earlier: commit `e7531ec`: S0 and all 7 cases behaved as expected, HTML reports and Grafana links verified in the browser. See section 7 and `examples/evidence/v5-live-20261107-e7531ec/`. Screenshots and figures shown in a presentation must come from a recorded run like this one, with its run ID.
 
 What the demo proves, and what it does not:
 
 | Mode | What runs | What it can show | What it cannot show |
 |---|---|---|---|
 | **S0** fixture replay | `replay_nin001.py` + `check.sh` | the observability chain works (7 spans, a log, an exemplar) | anything about a scenario's correctness |
-| **S1** synthetic journey | `v5_demo.py`: 100 synthetic NIN-001 transactions; per transaction 17 spans over 6 services and 3 required business events; OTLP export | the oracle is exact per transaction (events, values, span tree, order, latency) and catches injected faults | MOSIP/NIMS2 behaviour; backend ingestion |
+| **S1** synthetic journey | `v5_demo.py`: 100 synthetic NIN-001 transactions following the MOSIP flow (spec contract): per transaction 3 traces (T1 registration, T2 credential batch, T3 IDA callback, joined by span links), 42 spans over 12 services, 25 log records of which 14 business events; OTLP export | the oracle is exact per transaction (events, values, span tree, order, latency) and catches injected faults | MOSIP/NIMS2 behaviour; backend ingestion |
 | **S2-read** backend observation | `v5_backend.py collect`: queries Tempo, Loki, Prometheus for that run only; writes `report.html` | the signals really reached the backends, and the same oracle verdict holds on what was retrieved | MOSIP behaviour (the source is still the simulator) |
 | S2 live SUT (future) | the same contract on an instrumented MOSIP platform plus API/DB/audit evidence | product conformance, within scope | — |
 
@@ -53,14 +54,14 @@ Roles: presenter speaks, demo driver types and clicks. Terminal font enlarged, n
 
 | Time | Step | Action (driver) | Show | Say |
 |---|---|---|---|---|
-| 0:00 | **Specification** | open `contracts/NIN-001-v5-slice.json` (`required_events`, `journey_spans`, `scenario_steps`) and `models/nin-requirements.md` | 3 required events, the 17-span expected tree, 5 scenario steps with expected results | "The expectation is frozen before the run; faults never change it. The 2 s threshold is demo-only, not NF-04's 24 h." |
+| 0:00 | **Specification** | open `models/nin-requirements.md`, `models/nin-enrolment-activity.puml`, then `oracles/NIN-001.oracle.yaml`; run `python3 tools/oaef_compile.py --check` | requirements F-xx / NF-xx, the activity diagram, the oracle spec; `generated/contracts/NIN-001.contract.json` (60 obligations, each with `requirement_refs` and `model_element_refs`) and `generated/coverage.json` (uncovered: F-11, F-12, NF-02) | "Requirements and model are written by people; the contract is compiled by a script, never by an AI at run time. The expectation is frozen before the run; faults never change it." |
 | 1:30 | **S0 baseline** | `bash validation/demo/run_v5_demo.sh s0` | `RESULT: PASS` | "This proves the pipeline works. It would also pass with a missing step: it counts ≥ 7 spans and ≥ 1 log." |
-| 2:30 | **Nominal, 100 transactions** | `bash validation/demo/run_v5_demo.sh nominal` | `spans 1700/1700`, `BACKEND PASS | traces 100 / 100 | structured events 300 / 300`, then open the printed **REPORT** URL | "300 is not the check. Each transaction must have exactly its 3 events and its 17 spans under the right parents, with the right values." |
-| 4:30 | **The span tree** | in the report, TX-001: scroll the sequence diagram; click any arrow | Grafana opens the trace: Jarvis → packet receiver → Kafka → stage group → ID generator → ID repository → notification, 6 services | "One business transaction, end to end, across six services, from one click in the test report." |
-| 6:00 | **Duplicate on TX-017** | `bash validation/demo/run_v5_demo.sh duplicate`, open its REPORT | Failed checks: `EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 observed 2`; STEP-3 red; in the sequence, `uin.assigned — found x2 in Loki`; click it → Tempo on that span → **Related logs** shows the two events | "The trace looks normal. The defect is in the business events. Aggregate ≥ 300 would pass; per-transaction exactness catches it." |
-| 8:00 | **Broken trace context on TX-017** | `bash validation/demo/run_v5_demo.sh broken_link`, open its REPORT | `SPAN-PARENT-idrepo-server`, class `TRACE_CONTEXT_BROKEN`; in the sequence, the call from regproc-group1 ends at "external" and idrepo-identity is red "parent span not found" | "Every span is there; the chain is broken. Without the tree check this passes." |
-| 9:30 | **Latency breach on TX-017** | `bash validation/demo/run_v5_demo.sh slow`, open its REPORT | `NFR-DEMO-LATENCY` expected `max 2000 ms`, observed `2150 ms`, class `NFR_VIOLATION`; in Tempo, span → **Journey duration of this run** → histogram; the exemplar in the 5 s bucket opens TX-017's trace | "The verdict uses the exact per-transaction duration. The histogram is for navigation; its quantiles are estimates." |
-| 11:00 | **Missing event on TX-017** | `bash validation/demo/run_v5_demo.sh missing` (about 90 s: the collector polls until its timeout; talk meanwhile) | backend `INCONCLUSIVE | 299 / 300`, class `EVIDENCE_GAP`; in the report, `found x0 in Loki` | "A missing signal is not proof the business step did not happen. Without an independent source, the honest verdict is inconclusive." |
+| 2:30 | **Nominal, 100 transactions** | `bash validation/demo/run_v5_demo.sh nominal` | `PASS: 100 tx; 4401 checks evaluated, 0 failed, 2000 not evaluated (later increments); spans 4200, records 2500`, then `BACKEND PASS | traces 300 / 300 | structured events 2500 / 2500`; open the printed **REPORT** URL | "2500 is not the check. Each transaction must have exactly its events and its 42 spans under the right parents, with the right values. The 2000 *not evaluated* are REST, DB, audit and spec-metric obligations of later increments: never counted as passed." |
+| 4:30 | **The span tree** | in the report, TX-001: span tree, then click a row (or the screenshot `01-tempo-trace-TX-001.png`) | Tempo: `jarvis-e2e: NIN-001 New adult registration no hit`, 39 spans of T1 over 12 services (packet receiver, audit, Kafka, 7 stage groups, keymanager, S3, ID generator, ID repository) | "One business transaction, end to end, from one click in the test report." |
+| 6:00 | **Duplicate on TX-017** | `bash validation/demo/run_v5_demo.sh duplicate`, open its REPORT | `OBL-EVENTS-EV_UIN_ASSIGNED:count TX-017 expected 1 observed 2` with its requirement refs; screenshot `02-loki-events-TX-017.png` | "The trace looks normal. The defect is in the business events. Aggregate counts would pass; per-transaction exactness catches it." |
+| 8:00 | **Broken trace context on TX-017** | `bash validation/demo/run_v5_demo.sh broken_link`, open its REPORT | `OBL-TRACES-IDREPO_CREATE_SERVER:parent` (*parent span not in trace*), class `TRACE_CONTEXT_BROKEN`; 5 further failures marked *consequence of* it (T2/T3 links) | "Every span is there; the chain is broken. The cascade is reported as consequences, not as 6 separate defects." |
+| 9:30 | **Latency breach on TX-017** | `bash validation/demo/run_v5_demo.sh slow`, open its REPORT | `OBL-NFR-span_budgets_ms:IDREPO_CREATE_SERVER` expected `<= 3000 ms`, observed `3150 ms`, class `NFR_VIOLATION` | "The budget comes from the specification (NFR span budget), not from the test script." |
+| 11:00 | **Missing event on TX-017** | `bash validation/demo/run_v5_demo.sh missing` | `OBL-EVENTS-EV_UIN_ASSIGNED:count TX-017 expected 1 observed 0`; backend `INCONCLUSIVE | structured events 2499 / 2499`, class `EVIDENCE_GAP` | "A missing signal is not proof the business step did not happen. Without an independent source, the honest verdict is inconclusive." |
 | 12:30 | **Back from a log to the test** | in Grafana Loki, any event line of the run → field `oaef_run_id` → link **OAEF test report** | the report of that run opens (another application) | "From any signal back to the test that produced it, and from the test to every signal." |
 | 13:00 | **Evidence and replay** | `python3 validation/v5_backend.py verify-bundle --out /tmp/oaef-v5/duplicate`; change one byte in `backend-raw/loki.json`; run it again; `re-evaluate` | `BUNDLE INTEGRITY: PASS`, then `FAIL` after tampering; `re-evaluate` prints `MATCH` | "Anyone can re-check the verdict from the stored evidence. A hash is an integrity check, not a signature and not WORM storage." |
 | 14:00 | **Scope and next step** | back to the table at the top | S0/S1/S2-read vs S2 live | "Next: the same contract on an instrumented MOSIP platform, with API/DB/audit evidence." |
@@ -95,6 +96,7 @@ Expected exit codes (asserted by the script):
 | missing | 1 FAIL | 2 INCONCLUSIVE | `EVIDENCE_GAP` | 0 | 0 MATCH |
 | slow | 1 FAIL | 1 FAIL | `NFR_VIOLATION` | 0 | 0 MATCH |
 | broken_link | 1 FAIL | 1 FAIL | `TRACE_CONTEXT_BROKEN` | 0 | 0 MATCH |
+| missing_metric | 1 FAIL | 2 INCONCLUSIVE | `EVIDENCE_GAP` (idgenerator emits no HTTP metric) | 0 | 0 MATCH |
 | wrong_value (optional) | 1 FAIL | 1 FAIL | `OBSERVABILITY_VIOLATION` | 0 | 0 MATCH |
 | metric_count (optional) | 1 FAIL | 1 FAIL | `METRIC_RECONCILIATION_FAILURE` | 0 | 0 MATCH |
 
@@ -135,7 +137,23 @@ At the end of `run_v5_demo.sh` (and in the live CI), `validation/v5_export.py` w
 
 ### Live CI
 
-`.github/workflows/oaef-v5-live.yml` runs the same cases against the LGTM stack on a GitHub runner (on push to this branch, or manually with `cases` and `repeat` inputs) and uploads the reports, runs page and evidence as the artifact **oaef-v5-reports**. Grafana links in those reports point to the runner and stop resolving after the job; the static diagrams stay readable.
+`.github/workflows/oaef-v5-live.yml` runs the same cases against the LGTM stack on a GitHub runner (on push to this branch, or manually with the inputs `cases`, `repeat` and `contract` = `spec` (default) or `legacy`). It uploads the reports, runs page, evidence and screenshots as the artifact **oaef-v5-reports**, and the offline campaign zip as **oaef-v5-campaign-zip**. Grafana links in those reports point to the runner and stop resolving after the job; the screenshots and static diagrams stay readable.
+
+Triggering from a workstation (or from Claude Code) needs only the GitHub CLI, signed in once by the user (`gh auth login`, device flow; the token stays in the OS keyring):
+
+```bash
+gh workflow run oaef-v5-live.yml --ref docs/oaef-v5-model-to-evidence-demo -f contract=spec -f "cases=tests s0 nominal duplicate missing slow broken_link missing_metric"
+gh run watch <run-id> --exit-status
+gh run download <run-id> -n oaef-v5-campaign-zip
+```
+
+The Grafana admin password in CI is random per job and masked; it never leaves the runner.
+
+### Screenshots (Playwright script, not AI)
+
+After the evidence is sealed, `validation/demo/capture_screens.py` takes the screenshots in the pinned Playwright image (`mcr.microsoft.com/playwright/python:v1.62.0-noble`): per run `01-tempo-trace-<TX>` (span tree of the transaction to investigate), `02-loki-events-<TX>`, `03-prometheus-histogram`, `04-dashboard-journey`, `05-report`; for the campaign `10-dashboard-test-runs`, `11-tempo-service-graph`, `12-runs-page`, `13/14-allure`. `screenshots/index.json` lists each file with its caption, URL, status and browser errors. The script signs in through Grafana's login API (session cookie); a view showing Grafana's error or login page counts as **not captured**, and the step fails unless every view is captured. Screenshots illustrate the evidence; they are not part of the sealed bundle and never change a verdict.
+
+Locally: `pip install playwright==1.62.0 && playwright install chromium`, then `GF_ADMIN_PASSWORD=... python3 validation/demo/capture_screens.py --out /tmp/oaef-v5`.
 
 ## 4. Recovery during the session
 
@@ -166,6 +184,21 @@ At the end of `run_v5_demo.sh` (and in the live CI), `validation/v5_export.py` w
 - Pending from the V5 brief: verification-obligation manifest, Weaver registry, the full M01–M17 matrix, slides V5. `report.html` is the single-run view; the Allure report (`allure_report.sh`) is the cross-run view built from the same verdicts. Allure's own trend graphs need its `history/` folder carried between `generate` calls; not set up here.
 
 ## 7. Live run records
+
+### Run 4 — commit `0f9f3fc` (compiled specification contract, screenshots), GitHub Actions run 42420471946
+
+Contract `oaef.contract/v3` compiled from the specification; cases `tests s0 nominal duplicate missing slow broken_link missing_metric`; `DEMO RESULT: every case behaved as expected`; `SCREENSHOTS: 35/35 captured`; campaign zip 30 MB.
+
+| Case | S1 emitted oracle | Backend | Traces | Records | Checks evaluated / failed | First failure |
+|---|---|---|---|---|---|---|
+| nominal | PASS | PASS `S1_TELEMETRY_CONFORMANT` | 300 / 300 | 2500 / 2500 | 4401 / 0 | none |
+| duplicate | FAIL | FAIL `OBSERVABILITY_VIOLATION` | 300 / 300 | 2501 / 2501 | 4401 / 1 | `OBL-EVENTS-EV_UIN_ASSIGNED:count` TX-017 1 -> 2 |
+| missing | FAIL | INCONCLUSIVE `EVIDENCE_GAP` | 300 / 300 | 2499 / 2499 | 4401 / 1 | `OBL-EVENTS-EV_UIN_ASSIGNED:count` TX-017 1 -> 0 |
+| slow | FAIL | FAIL `NFR_VIOLATION` | 300 / 300 | 2500 / 2500 | 4401 / 1 | `OBL-NFR-span_budgets_ms:IDREPO_CREATE_SERVER` TX-017 <= 3000 -> 3150 ms |
+| broken_link | FAIL | FAIL `TRACE_CONTEXT_BROKEN` | 300 / 300 | 2500 / 2500 | 4401 / 6 (5 consequences) | `OBL-TRACES-IDREPO_CREATE_SERVER:parent` TX-017 |
+| missing_metric | FAIL | INCONCLUSIVE `EVIDENCE_GAP` | 300 / 300 | 2500 / 2500 | 4401 / 0 | idgenerator service metrics INCONCLUSIVE (4) |
+
+Defects found and fixed on the way (all in the screenshot step, none in a verdict): Grafana 13 does not load in Chromium 131 (Playwright 1.49.1), and the first runs counted its error page as a screenshot (`e7cc6d8`, `e80c7fb`); dashboards never reach network idle (`266e1ac`); Loki instant queries lost their legend ("Value #A") and the journey verdict showed FAIL on green (`266e1ac`, `0f9f3fc`).
 
 ### Run 3 — commit `564115a` (investigation report, metrics, dashboards, stability)
 

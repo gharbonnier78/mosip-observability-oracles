@@ -16,7 +16,7 @@ on:
         default: '1'
       contract:
         description: 'Oracle contract: spec (compiled from oracles/*.oracle.yaml) or legacy (hand-written V5 slice)'
-        default: 'legacy'
+        default: 'spec'
         type: choice
         options: [legacy, spec]
   push:
@@ -40,7 +40,7 @@ jobs:
       PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.62.0-noble   # pinned: browsers for the screenshots
       PLAYWRIGHT_VERSION: '1.62.0'                                           # Python package, same version as the image
       OAEF_REPEAT: ${{ github.event.inputs.repeat || '1' }}
-      OAEF_CONTRACT: ${{ github.event.inputs.contract || 'legacy' }}
+      OAEF_CONTRACT: ${{ github.event.inputs.contract || 'spec' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
