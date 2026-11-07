@@ -9,7 +9,7 @@ What the demo proves, and what it does not:
 | Mode | What runs | What it can show | What it cannot show |
 |---|---|---|---|
 | **S0** fixture replay | `replay_nin001.py` + `check.sh` | the observability chain works (7 spans, a log, an exemplar) | anything about a scenario's correctness |
-| **S1** synthetic journey | `v5_demo.py`: 100 synthetic NIN-001 transactions following the MOSIP flow (spec contract): per transaction 3 traces (T1 registration, T2 credential batch, T3 IDA callback, joined by span links), 42 spans over 12 services, 25 log records of which 14 business events; OTLP export | the oracle is exact per transaction (events, values, span tree, order, latency) and catches injected faults | MOSIP/NIMS2 behaviour; backend ingestion |
+| **S1** synthetic journey | `v5_demo.py`: 100 synthetic NIN-001 transactions following the MOSIP flow (spec contract): per transaction 3 traces (T1 registration, T2 credential batch, T3 IDA callback, joined by span links), 42 spans over 15 services, 25 log records of which 14 business events; OTLP export | the oracle is exact per transaction (events, values, span tree, order, latency) and catches injected faults | MOSIP/NIMS2 behaviour; backend ingestion |
 | **S2-read** backend observation | `v5_backend.py collect`: queries Tempo, Loki, Prometheus for that run only; writes `report.html` | the signals really reached the backends, and the same oracle verdict holds on what was retrieved | MOSIP behaviour (the source is still the simulator) |
 | S2 live SUT (future) | the same contract on an instrumented MOSIP platform plus API/DB/audit evidence | product conformance, within scope | — |
 
