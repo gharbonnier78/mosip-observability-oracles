@@ -152,7 +152,7 @@
       "targets": [
         {
           "expr": "sum by (status) (count_over_time({service_name=\"oaef-jarvis\"} |= \"$run_id\" | json status [$__range]))",
-          "queryType": "instant",
+          "queryType": "range",
           "legendFormat": "{{status}}",
           "refId": "A",
           "datasource": {

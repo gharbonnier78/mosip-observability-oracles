@@ -110,7 +110,11 @@ def main():
             status = 'ok'
             problems.clear()
             try:
-                page.goto(url, wait_until='networkidle', timeout=60000)
+                page.goto(url, wait_until='load', timeout=60000)
+                try:   # live dashboards and the service map may keep polling: idle is awaited, not required
+                    page.wait_for_load_state('networkidle', timeout=20000)
+                except Exception:
+                    pass
                 time.sleep(6 if kind == 'grafana' else 1)   # panels and trace view render after the network settles
                 page.screenshot(path=str(target), full_page=(kind == 'page'))
                 text = page.inner_text('body')

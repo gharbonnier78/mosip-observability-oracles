@@ -3,7 +3,8 @@
 
   python3 observability/dashboards/build_dashboards.py      -> oaef-test-runs.json, oaef-journey.json
 
-Run-scoped metrics are one sample per run: panels read them with last_over_time(...[$__range]) so a run stays
+Loki panels use range queries reduced to their last value (Grafana 13 drops the legend of instant Loki
+queries: a stat showed 'Value #A'). Run-scoped metrics are one sample per run: panels read them with last_over_time(...[$__range]) so a run stays
 visible for the whole dashboard range (a plain instant query only looks back 5 minutes).
 Reusable outside MOSIP: data sources are dashboard variables (any Prometheus/Loki/Tempo), and the only
 conventions assumed are the OAEF ones: verdict events `oaef.test.verdict` from service `oaef-jarvis`,
@@ -50,7 +51,7 @@ test_runs = dashboard(
     [ds_var('ds_loki', 'loki', 'Loki')],
     [
         panel(1, 'stat', 'Runs by verdict', 0, 0, 8, 6, LOKI,
-              [{'expr': f'sum by (status) (count_over_time({VERDICTS} [$__range]))', 'queryType': 'instant',
+              [{'expr': f'sum by (status) (count_over_time({VERDICTS} [$__range]))', 'queryType': 'range',
                 'legendFormat': '{{status}}'}],
               options={'reduceOptions': {'calcs': ['lastNotNull']}, 'colorMode': 'background', 'textMode': 'value_and_name'},
               fieldConfig={'defaults': {}, 'overrides': [
@@ -58,8 +59,9 @@ test_runs = dashboard(
                   for n, c in (('PASS', 'green'), ('FAIL', 'red'), ('INCONCLUSIVE', 'orange'))]}),
         panel(2, 'piechart', 'Failures by diagnostic class', 8, 0, 8, 6, LOKI,
               [{'expr': f'sum by (cls) (count_over_time({{service_name="oaef-jarvis"}} | json status, cls="classes[0]" '
-                        f'| status != "PASS" [$__range]))', 'queryType': 'instant', 'legendFormat': '{{cls}}'}],
-              options={'legend': {'displayMode': 'table', 'placement': 'right', 'values': ['value']}}),
+                        f'| status != "PASS" [$__range]))', 'queryType': 'range', 'legendFormat': '{{cls}}'}],
+              options={'reduceOptions': {'calcs': ['lastNotNull']}, 'pieType': 'donut',
+                       'legend': {'displayMode': 'table', 'placement': 'right', 'values': ['value']}}),
         panel(3, 'timeseries', 'Verdicts over time', 16, 0, 8, 6, LOKI,
               [{'expr': f'sum by (status) (count_over_time({VERDICTS} [$__interval]))', 'legendFormat': '{{status}}'}],
               fieldConfig={'defaults': {'custom': {'drawStyle': 'bars', 'stacking': {'mode': 'normal'}}}, 'overrides': []}),
@@ -97,7 +99,7 @@ journey = dashboard(
               [{'expr': f'sum(last_over_time(oaef_synthetic_journey_duration_seconds_count{{{RUN}}}[$__range]))', 'instant': True}]),
         panel(3, 'stat', 'Verdict of this run', 16, 0, 8, 5, LOKI,
               [{'expr': f'sum by (status) (count_over_time({{service_name="oaef-jarvis"}} |= "$run_id" | json status [$__range]))',
-                'queryType': 'instant', 'legendFormat': '{{status}}'}],
+                'queryType': 'range', 'legendFormat': '{{status}}'}],
               options={'reduceOptions': {'calcs': ['lastNotNull']}, 'textMode': 'name', 'colorMode': 'background'}),
         panel(4, 'bargauge', 'Requests per service (this run)', 12, 5, 6, 5, PROM,
               [{'expr': f'sum by (service_name) (last_over_time(http_server_request_duration_seconds_count{{{RUN}, service_name=~"$service"}}[$__range]))',

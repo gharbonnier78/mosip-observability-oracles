@@ -63,8 +63,8 @@ class Links:
         return f'{self.base}/d/oaef-journey/oaef-journey?var-run_id={run_id}&from={self.range["from"]}&to={self.range["to"]}'
 
     def metric(self, run_id):
-        return self._explore('prometheus', {'expr': f'oaef_synthetic_journey_duration_seconds_bucket{{oaef_run_id="{run_id}"}}',
-                                            'range': True, 'exemplar': True})
+        return self._explore('prometheus', {'expr': f'sum by (le) (oaef_synthetic_journey_duration_seconds_bucket{{oaef_run_id="{run_id}"}})',
+                                            'legendFormat': 'le {{le}}', 'range': True, 'exemplar': True})
 
 
 def esc(x):

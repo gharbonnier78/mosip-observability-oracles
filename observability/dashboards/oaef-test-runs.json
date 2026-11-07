@@ -45,7 +45,7 @@
       "targets": [
         {
           "expr": "sum by (status) (count_over_time({service_name=\"oaef-jarvis\"} | json [$__range]))",
-          "queryType": "instant",
+          "queryType": "range",
           "legendFormat": "{{status}}",
           "refId": "A",
           "datasource": {
@@ -131,7 +131,7 @@
       "targets": [
         {
           "expr": "sum by (cls) (count_over_time({service_name=\"oaef-jarvis\"} | json status, cls=\"classes[0]\" | status != \"PASS\" [$__range]))",
-          "queryType": "instant",
+          "queryType": "range",
           "legendFormat": "{{cls}}",
           "refId": "A",
           "datasource": {
@@ -141,6 +141,12 @@
         }
       ],
       "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "pieType": "donut",
         "legend": {
           "displayMode": "table",
           "placement": "right",
