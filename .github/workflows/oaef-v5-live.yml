@@ -37,8 +37,8 @@ jobs:
     timeout-minutes: 40
     env:
       OAEF_OUT: ${{ github.workspace }}/oaef-v5
-      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.49.1-noble   # pinned: browsers for the screenshots
-      PLAYWRIGHT_VERSION: '1.49.1'                                           # Python package, same version as the image
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.62.0-noble   # pinned: browsers for the screenshots
+      PLAYWRIGHT_VERSION: '1.62.0'                                           # Python package, same version as the image
       OAEF_REPEAT: ${{ github.event.inputs.repeat || '1' }}
       OAEF_CONTRACT: ${{ github.event.inputs.contract || 'legacy' }}
     steps:

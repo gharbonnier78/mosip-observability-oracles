@@ -99,10 +99,16 @@ def main():
             print(f'Grafana authentication failed (login HTTP {r.status}, api/user HTTP {me.status})', file=sys.stderr)
             return 2
         page = context.new_page()
+        print(f'browser: chromium {browser.version}')
+        problems = []   # browser-side errors of the current view (diagnosis when Grafana does not render)
+        page.on('console', lambda m: problems.append(f'console {m.type}: {m.text[:200]}') if m.type == 'error' else None)
+        page.on('pageerror', lambda e: problems.append(f'pageerror: {str(e)[:200]}'))
+        page.on('requestfailed', lambda r: problems.append(f'requestfailed: {r.url[:120]} {r.failure}'))
         for rel, caption, url, kind in shots:
             target = out / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             status = 'ok'
+            problems.clear()
             try:
                 page.goto(url, wait_until='networkidle', timeout=60000)
                 time.sleep(6 if kind == 'grafana' else 1)   # panels and trace view render after the network settles
@@ -113,8 +119,12 @@ def main():
             except Exception as ex:   # one failed view must not hide the others; recorded in the index
                 status = f'error: {type(ex).__name__}'
             index.append({'file': rel, 'caption': caption, 'url': url, 'status': status,
-                          'taken_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
+                          'taken_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                          'browser_errors': problems[:10]})
             print(f'{status:<8} {rel}')
+            if status != 'ok':
+                for line in problems[:5]:
+                    print(f'         {line}')
         browser.close()
     (out / 'screenshots').mkdir(exist_ok=True)
     (out / 'screenshots' / 'index.json').write_text(json.dumps(index, indent=1) + '\n', encoding='utf-8')
