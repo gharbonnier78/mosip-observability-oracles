@@ -1,7 +1,7 @@
 # OAEF V5 — live demo runbook (S0 → S1 → S2-read)
 
 **Status:** operating procedure for the demonstrator on branch `docs/oaef-v5-model-to-evidence-demo`.
-**Live run status:** the expected results below are **acceptance criteria**. Until the "Live run record" table at the end is filled in from a real Codespaces run, no screenshot, count or timing in a presentation may be shown as observed.
+**Live run status:** executed end to end in GitHub Codespaces on 2026-11-07 (commit `ceec0cb`): all 6 cases and the S0 smoke behaved as expected. See the "Live run record" (section 7) and `examples/evidence/v5-live-20261107/`. Screenshots and figures shown in a presentation must come from a recorded run like this one, with its run ID.
 
 What the demo proves, and what it does not:
 
@@ -47,9 +47,9 @@ Roles: presenter speaks, demo driver types. Terminal font enlarged, notification
 | 1:30 | **S0 baseline** | `bash validation/demo/run_v5_demo.sh s0` | `RESULT: PASS`, the 7-span trace in Grafana | "This proves the pipeline works. It would also pass with a missing step: it counts ≥ 7 spans and ≥ 1 log." |
 | 3:00 | **S1 + S2-read nominal, 100 transactions** | `bash validation/demo/run_v5_demo.sh nominal` | `PASS: 100 tx; expected events 300; observed 300`, then `BACKEND PASS | traces 100 / 100 | structured events 300 / 300` | "300 is not the check. Each transaction must have exactly its 3 events, with the right value, trace and order." |
 | 5:30 | **Investigate in Grafana** | paste the printed queries in Explore | Tempo: the TX-017 trace (3 spans). Loki: the run's 3 events for TX-017. Prometheus: the run's histogram, count 100 | "Grafana is for investigation. The verdict comes from the oracle, offline." |
-| 7:00 | **Duplicate on TX-017** | `bash validation/demo/run_v5_demo.sh duplicate` | `FAIL … EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 2`, 301 events collected; in Loki, two `uin.assigned` lines for TX-017 | "Aggregate ≥ 300 would pass. Per-transaction exactness catches it." |
-| 9:00 | **Missing event on TX-017** | `bash validation/demo/run_v5_demo.sh missing` | S1 `FAIL` on the emitted payload; backend `INCONCLUSIVE`, classification `EVIDENCE_GAP` | "A missing signal is not proof the business step did not happen. Without an independent source, the honest verdict is inconclusive." |
-| 10:30 | **Latency breach on TX-017** | `bash validation/demo/run_v5_demo.sh slow` | `NFR-DEMO-LATENCY TX-017` FAIL with the exact duration (2150 ms > 2000 ms); in Tempo, the longer TX-017 trace | "The NFR verdict uses exact per-transaction durations. The histogram p95 is only an estimate." |
+| 7:00 | **Duplicate on TX-017** | `bash validation/demo/run_v5_demo.sh duplicate` | `EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 2` and `RUN-EVENT-COUNT expected 300 actual 301`, then `BACKEND FAIL | structured events 301 / 300`; in Loki, two `uin.assigned` lines for TX-017 | "Aggregate ≥ 300 would pass. Per-transaction exactness catches it." |
+| 9:00 | **Missing event on TX-017** | `bash validation/demo/run_v5_demo.sh missing` | S1 `FAIL` on the emitted payload; backend `INCONCLUSIVE | structured events 299 / 300`, classification `EVIDENCE_GAP`. This case takes about 90 s: the collector keeps polling for the missing event until its timeout, which is the point to make while it runs | "A missing signal is not proof the business step did not happen. Without an independent source, the honest verdict is inconclusive." |
+| 10:30 | **Latency breach on TX-017** | `bash validation/demo/run_v5_demo.sh slow` | `NFR-DEMO-LATENCY TX-017 expected True actual False`; the exact duration (2150 ms > 2000 ms) is in the run's `ledger.json`; in Tempo, the longer TX-017 trace | "The NFR verdict uses exact per-transaction durations. The histogram p95 is only an estimate." |
 | 12:00 | **Evidence and replay** | `cat /tmp/oaef-v5/duplicate/backend-verdict.json`; `python3 validation/v5_backend.py verify-bundle --out /tmp/oaef-v5/duplicate`; then change one byte in `backend-raw/loki.json` and run it again | `BUNDLE INTEGRITY: PASS`, then `FAIL` after tampering; `re-evaluate` prints `MATCH` | "Anyone can re-check the verdict from the stored evidence. A hash is an integrity check, not a signature and not WORM storage." |
 | 14:00 | **Scope and next step** | back to the table at the top | S0/S1/S2-read vs S2 live | "Next: the same contract on an instrumented MOSIP platform, with API/DB/audit evidence." |
 
@@ -89,11 +89,36 @@ Expected exit codes (asserted by the script):
 - Tempo's JSON API returns trace and span IDs base64-encoded; the collector normalises them to hex before the oracle runs (covered by `test_tempo_base64_ids`).
 - Pending from the V5 brief: verification-obligation manifest, Weaver registry, image pinning by digest, the full M01–M17 matrix, slides V5.
 
-## 7. Live run record (fill in from the real run)
+## 7. Live run record
 
-| Date | Codespace image / LGTM digest | Case | run_id | S1 exit | collect exit | traces | events | Notes |
+Run of `bash validation/demo/run_v5_demo.sh tests s0 nominal duplicate missing slow wrong_value metric_count`, GitHub Codespaces (2 CPU, 7 GiB, universal:2, Python 3.12.1, Docker 28.1.1), image `grafana/otel-lgtm:latest` = `sha256:8d078e2af327da86c91cb907cde1e87c37e13708b8ec35672c99d8e76441e661` (Grafana 13.2.3), code at `ceec0cb`, 2026-11-07, finished 16:33 UTC. Unit and mutation tests: 13/13 OK. S0 smoke: PASS (7 spans, 1 log, exemplar → trace).
+
+| Case | run_id | S1 exit | collect exit | Backend verdict | Traces | Events | Failed checks (S1) | Collect attempts |
 |---|---|---|---|---|---|---|---|---|
-| | | nominal | | | | / 100 | / 300 | |
-| | | duplicate | | | | / 100 | / 300 | |
-| | | missing | | | | / 100 | / 300 | |
-| | | slow | | | | / 100 | / 300 | |
+| nominal | `s1-c7d324d7093e` | 0 | 0 | PASS | 100/100 | 300/300 | none; 12/12 metric checks PASS | 1 |
+| duplicate | `s1-cce90f040257` | 1 | 1 | FAIL | 100/100 | 301/300 | `EVENT-EXACT-mosip.identity.uin.assigned` TX-017 1→2; `RUN-EVENT-COUNT` 300→301 | 1 |
+| missing | `s1-f5afb8df1f9e` | 1 | 2 | INCONCLUSIVE (`EVIDENCE_GAP`) | 100/100 | 299/300 | `EVENT-EXACT-mosip.identity.uin.assigned` TX-017 1→0 | 23 (timeout) |
+| slow | `s1-cabd7956727d` | 1 | 1 | FAIL | 100/100 | 300/300 | `NFR-DEMO-LATENCY` TX-017 | 1 |
+| wrong_value | `s1-4a24ee356e5b` | 1 | 1 | FAIL | 100/100 | 300/300 | `EVENT-EFFECT-VALUE` TX-017 `SYN-20261107-000017`→`CORRUPTED` | 2 |
+| metric_count | `s1-8e5f4be58014` | 1 | 1 | FAIL | 100/100 | 300/300 | `METRIC-COUNT` 100→101; backend 9/12 metric checks FAIL | 1 |
+
+For every case, `verify-bundle` returned PASS and `re-evaluate` returned MATCH.
+
+Observed in this run:
+- Tempo's JSON API returned trace and span IDs **base64-encoded** (`batches` shape). Without the normalisation added in `ceec0cb`, `collect` would have stopped with an error on every case.
+- The container reported `unhealthy` for its first minutes while Grafana already answered; it turned `healthy` later. Wait for Grafana's `/api/health`, not for the Docker health status.
+
+Evidence: `examples/evidence/v5-live-20261107/` holds the log, environment and, per case, manifest, verdicts, query metadata, report and hashes. `full-bundles.tgz` (552 KB) holds the complete bundles, including the raw Tempo, Loki and Prometheus replies. To re-check a verdict offline:
+
+```bash
+mkdir -p /tmp/replay && tar xzf examples/evidence/v5-live-20261107/full-bundles.tgz -C /tmp/replay
+python3 validation/v5_backend.py verify-bundle --out /tmp/replay/oaef-v5/duplicate
+python3 validation/v5_backend.py re-evaluate --out /tmp/replay/oaef-v5/duplicate
+```
+
+`re-evaluate` refuses to claim an identical replay if `validation/v5_backend.py` or `validation/v5_demo.py` changed since `ceec0cb` (it compares their hashes with the ones in the bundle).
+
+Follow-ups found during the run (not fixed, to keep this evidence re-evaluable):
+- The `slow` case is classified `OBSERVABILITY_VIOLATION`; a latency breach should get its own class (for example `NFR_VIOLATION`).
+- The `NFR-DEMO-LATENCY` failure record shows `expected True actual False`; it should carry the measured duration and the threshold.
+- Pin the LGTM image by the digest above instead of `latest`.
