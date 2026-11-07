@@ -1,0 +1,29 @@
+{
+  "backend_ingestion_verified": false,
+  "count_expected_events": 300,
+  "count_expected_spans": 1700,
+  "count_expected_transactions": 100,
+  "count_observed_events": 299,
+  "count_observed_spans": 1700,
+  "failures": [
+    {
+      "actual": 299,
+      "check_id": "RUN-EVENT-COUNT",
+      "expected": 300,
+      "status": "FAIL",
+      "transaction_id": null
+    },
+    {
+      "actual": 0,
+      "check_id": "EVENT-EXACT-mosip.identity.uin.assigned",
+      "expected": 1,
+      "ref": "mosip.identity.uin.assigned",
+      "status": "FAIL",
+      "transaction_id": "TX-017"
+    }
+  ],
+  "mode": "S1",
+  "run_id": "s1-0259e09626d6",
+  "source": "stored synthetic emitted payload only",
+  "status": "FAIL"
+}

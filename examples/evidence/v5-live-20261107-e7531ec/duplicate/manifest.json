@@ -1,0 +1,12 @@
+{
+  "contract_sha256": "b2bbca9305be55b9d624d3061d3019b4b66a9be37cf196c3e9f48549b5cbcb7a",
+  "contract_snapshot_sha256": "84a5a8e48660505e1706be660501182bc5b02f153d456ea58a2fddc6ee39b77d",
+  "fault": "duplicate",
+  "mode": "S1",
+  "otlp_status": "attempted",
+  "run_id": "s1-1cdc48f2d24f",
+  "scope": "S1 simulated NIN-001 journey (3 required business events, 17 expected spans over 6 services), NOT full MOSIP NIN-001 conformance",
+  "seed": 20261107,
+  "target": 17,
+  "transactions": 100
+}

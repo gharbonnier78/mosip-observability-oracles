@@ -1,0 +1,105 @@
+{
+  "backend_ingestion_verified": false,
+  "backend_query_provenance": "backend-meta.json",
+  "business_sut_verified": false,
+  "classification": "NFR_VIOLATION",
+  "collected_artifact": "collected-otel.json",
+  "diagnostic_classes": [
+    "NFR_VIOLATION"
+  ],
+  "event_span_failures": [
+    {
+      "actual": {
+        "upload_to_assignment_ms": 2150
+      },
+      "check_id": "NFR-DEMO-LATENCY",
+      "expected": {
+        "max_upload_to_assignment_ms": 2000
+      },
+      "status": "FAIL",
+      "transaction_id": "TX-017"
+    }
+  ],
+  "events_collected": 300,
+  "events_expected": 300,
+  "evidence_sufficiency": "SUFFICIENT_FOR_S1",
+  "metric_checks": [
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-COUNT-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-SUM-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-MEASUREMENTS-COUNT",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 14.716,
+      "check_id": "PROM-MEASUREMENTS-SUM-S",
+      "expected": 14.716,
+      "status": "PASS"
+    },
+    {
+      "actual": 25.0,
+      "check_id": "PROM-BUCKET-0.1",
+      "expected": 25,
+      "status": "PASS"
+    },
+    {
+      "actual": 99.0,
+      "check_id": "PROM-BUCKET-0.25",
+      "expected": 99,
+      "status": "PASS"
+    },
+    {
+      "actual": 99.0,
+      "check_id": "PROM-BUCKET-0.5",
+      "expected": 99,
+      "status": "PASS"
+    },
+    {
+      "actual": 99.0,
+      "check_id": "PROM-BUCKET-1",
+      "expected": 99,
+      "status": "PASS"
+    },
+    {
+      "actual": 99.0,
+      "check_id": "PROM-BUCKET-2",
+      "expected": 99,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-5",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-10",
+      "expected": 100,
+      "status": "PASS"
+    },
+    {
+      "actual": 100.0,
+      "check_id": "PROM-BUCKET-INF",
+      "expected": 100,
+      "status": "PASS"
+    }
+  ],
+  "mode": "S1_BACKEND_OBSERVATION",
+  "run_id": "s1-b3b33a1edad6",
+  "status": "FAIL",
+  "trace_count": 100,
+  "transaction_count": 100
+}
