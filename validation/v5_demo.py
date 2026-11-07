@@ -18,6 +18,7 @@ import random
 import sys
 import time
 import urllib.request
+import uuid
 from collections import Counter
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,7 +79,7 @@ def generate(count, seed, fault, target, out, otlp_url):
         raise ValueError('count must be positive, target must be within count')
     contract = load(CONTRACT)
     rng = random.Random(seed)
-    run_id = 's1-' + deterministic_id(seed, count, 'run', 'id', 12)
+    run_id = 's1-' + (uuid.uuid4().hex[:12] if otlp_url else deterministic_id(seed, count, 'run', 'id', 12))
     # Live export must use recent timestamps so traces/logs are discoverable in Grafana.
     # Offline runs stay byte-for-byte deterministic for a fixed seed and count.
     base = time.time_ns() - 30_000_000_000 if otlp_url else 1_800_000_000_000_000_000
@@ -112,7 +113,10 @@ def generate(count, seed, fault, target, out, otlp_url):
             record = {'timeUnixNano': str(t), 'observedTimeUnixNano': str(t),
                       'severityNumber': 9, 'severityText': 'INFO', 'eventName': event,
                       'traceId': trace_id, 'spanId': span_id,
-                      'body': {'stringValue': event},
+                      'body': {'stringValue': json.dumps({'event_name': event, 'run_id': run_id,
+                            'transaction_id': tx_id, 'synthetic_effect_id': value,
+                            'trace_id': trace_id, 'span_id': span_id,
+                            'result': 'success'}, sort_keys=True, separators=(',', ':'))},
                       'attributes': attrs({'oaef.run.id': run_id, 'oaef.transaction.id': tx_id,
                                            'oaef.synthetic.effect.id': value, 'oaef.result': 'success'})}
             logs.append(record)
@@ -129,11 +133,19 @@ def generate(count, seed, fault, target, out, otlp_url):
         if fault == 'missing':
             logs.remove(original)
         elif fault == 'duplicate':
-            logs.append(copy.deepcopy(original))  # deliberately same logical event, not new effect
+            duplicate = copy.deepcopy(original)
+            # Distinct log emission, SAME logical business effect. Loki may deduplicate
+            # identical timestamp/body records; this is not an OTLP transport retry.
+            duplicate['timeUnixNano'] = str(int(original['timeUnixNano']) + 1000)
+            duplicate['observedTimeUnixNano'] = duplicate['timeUnixNano']
+            logs.append(duplicate)
         elif fault == 'wrong_value':
             for a in original['attributes']:
                 if a['key'] == 'oaef.synthetic.effect.id':
                     a['value']['stringValue'] = 'CORRUPTED'
+            body = json.loads(original['body']['stringValue'])
+            body['synthetic_effect_id'] = 'CORRUPTED'
+            original['body']['stringValue'] = json.dumps(body, sort_keys=True, separators=(',', ':'))
     histogram_counts = [sum(1 for d in durations if d <= b) for b in BOUNDS]
     bucket_counts = []
     previous = 0
@@ -142,12 +154,16 @@ def generate(count, seed, fault, target, out, otlp_url):
         previous = n
     bucket_counts.append(str(count - previous))
     actual_count = count + (1 if fault == 'metric_count' else 0)
+    if fault == 'metric_count':
+        # Corrupt the business-to-metric count without constructing an invalid
+        # histogram: an extra 0.12s measurement is counted in the first bucket.
+        bucket_counts[1] = str(int(bucket_counts[1]) + 1)
     metric = {'name': contract['metric_name'], 'unit': contract['metric_unit'],
               'histogram': {'aggregationTemporality': 2, 'dataPoints': [{
-                  'attributes': attrs({'oaef.simulation.mode': 'S1'}),
+                  'attributes': attrs({'oaef.simulation.mode': 'S1', 'oaef.run.id': run_id}),
                   'startTimeUnixNano': str(base),
                   'timeUnixNano': str(base + (count + 1) * tx_spacing),
-                  'count': str(actual_count), 'sum': sum(durations),
+                  'count': str(actual_count), 'sum': sum(durations) + (0.12 if fault == 'metric_count' else 0),
                   'explicitBounds': BOUNDS, 'bucketCounts': bucket_counts}]}}
     otlp = {'traces': {'resourceSpans': [{'resource': {'attributes': source},
                                         'scopeSpans': [{'scope': {'name': 'oaef.v5.s1'}, 'spans': spans}]}]},
@@ -161,6 +177,7 @@ def generate(count, seed, fault, target, out, otlp_url):
     dump(out / 'manifest.json', {'run_id': run_id, 'mode': 'S1', 'seed': seed,
                                   'transactions': count, 'fault': fault, 'target': target,
                                   'scope': contract['scope'], 'contract_sha256': hashlib.sha256(CONTRACT.read_bytes()).hexdigest(),
+                                  'contract_snapshot_sha256': hashlib.sha256((out / 'contract.json').read_bytes()).hexdigest(),
                                   'otlp_status': 'not_requested' if not otlp_url else 'attempted'})
     print('run id:', run_id, '| example trace id:', spans[0]['traceId'])
     if otlp_url:
@@ -168,8 +185,10 @@ def generate(count, seed, fault, target, out, otlp_url):
     return verify(out)
 
 
-def verify(out):
-    contract, ledger, otlp = (load(out / name) for name in ('contract.json', 'ledger.json', 'observed.json'))
+def verify(out, observed_name='observed.json', verdict_name='verdict.json', check_metrics=True, source=None):
+    contract = load(out / 'contract.json')
+    ledger = load(out / 'ledger.json')
+    otlp = load(out / observed_name)
     manifest = load(out / 'manifest.json')
     checks = []
 
@@ -221,22 +240,23 @@ def verify(out):
               contract['max_upload_to_assignment_ms'], True, tx)
     check('RUN-UNKNOWN-TRANSACTIONS', sorted(set(by_tx) - set(all_ids)), [])
     check('RUN-UNKNOWN-SPAN-TRANSACTIONS', sorted(set(span_by_tx) - set(all_ids)), [])
-    metric = otlp['metrics']['resourceMetrics'][0]['scopeMetrics'][0]['metrics'][0]
-    point = metric['histogram']['dataPoints'][0]
-    check('METRIC-NAME', metric['name'], contract['metric_name'])
-    check('METRIC-UNIT', metric['unit'], contract['metric_unit'])
-    check('METRIC-COUNT', int(point['count']), len(ledger))
-    check('METRIC-BUCKET-TOTAL', sum(map(int, point['bucketCounts'])), len(ledger))
-    check('METRIC-SUM', round(point['sum'], 6),
-          round(sum(x['upload_to_assignment_ms'] / 1000 for x in ledger), 6))
+    if check_metrics:
+        metric = otlp['metrics']['resourceMetrics'][0]['scopeMetrics'][0]['metrics'][0]
+        point = metric['histogram']['dataPoints'][0]
+        check('METRIC-NAME', metric['name'], contract['metric_name'])
+        check('METRIC-UNIT', metric['unit'], contract['metric_unit'])
+        check('METRIC-COUNT', int(point['count']), len(ledger))
+        check('METRIC-BUCKET-TOTAL', sum(map(int, point['bucketCounts'])), len(ledger))
+        check('METRIC-SUM', round(point['sum'], 6),
+              round(sum(x['upload_to_assignment_ms'] / 1000 for x in ledger), 6))
     status = 'FAIL' if checks else 'PASS'
-    verdict = {'run_id': manifest['run_id'], 'mode': 'S1', 'source': 'stored synthetic emitted payload only',
+    verdict = {'run_id': manifest['run_id'], 'mode': 'S1', 'source': source or 'stored synthetic emitted payload only',
                'backend_ingestion_verified': False,
                'count_expected_transactions': len(ledger),
                'count_observed_events': len(records),
                'count_expected_events': len(ledger) * len(contract['required_events']),
                'status': status, 'failures': checks}
-    dump(out / 'verdict.json', verdict)
+    dump(out / verdict_name, verdict)
     print(f"{status}: {len(ledger)} tx; expected events {verdict['count_expected_events']}; "
           f"observed {len(records)}; failed checks {len(checks)}")
     for x in checks[:8]:
