@@ -7,6 +7,7 @@ events actually retrieved from the backends, the input/output values carried by 
 and Grafana links that open the exact trace, span, logs or metric. Synthetic S1 data only.
 """
 import html
+from collections import Counter
 import json
 import os
 from urllib.parse import quote
@@ -597,6 +598,8 @@ def write_report(out, grafana_public, uids):
         shown.append(first_ok)
     tx_of = lambda o: av(o['attributes']).get('oaef.transaction.id')
     status = backend['status']
+    metric_counts = Counter(m['status'] for m in backend['metric_checks'])
+    metric_summary = ', '.join(f'{k}: {v}' for k, v in sorted(metric_counts.items())) + f' (of {len(backend["metric_checks"])} metric checks)'
     h = [f'<!doctype html><meta charset="utf-8"><title>OAEF report {esc(run_id)}</title><style>{CSS}</style>',
          f'<h1>NIN-001 — run <code>{esc(run_id)}</code> <span class="badge {status}">{status}</span></h1>',
          f'<div>Fault injected: <b>{esc(manifest["fault"])}</b>'
@@ -615,7 +618,7 @@ def write_report(out, grafana_public, uids):
          f'<td>{backend["events_expected"]}</td><td>{backend["events_collected"]}</td>'
          f'<td>{a(links.logs(selector, run_id), "all events of this run")}</td></tr>',
          f'<tr><td>Journey duration histogram</td><td>count {len(ledger)}</td>'
-         f'<td>{esc(", ".join(f"{m["check_id"]}: {m["status"]}" for m in backend["metric_checks"][:4]))}…</td>'
+         f'<td>{esc(metric_summary)}</td>'
          f'<td>{a(links.metric(run_id), "histogram + exemplars")}</td></tr></table>']
     prom_raw = load(out / 'backend-raw/prometheus.json') if (out / 'backend-raw/prometheus.json').exists() else None
     h.append('<h2>Run overview (from the retrieved spans and metrics)</h2>'
