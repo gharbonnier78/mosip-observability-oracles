@@ -1,7 +1,7 @@
 # OAEF V5 — live demo runbook (S0 → S1 → S2-read)
 
 **Status:** operating procedure for the demonstrator on branch `docs/oaef-v5-model-to-evidence-demo`.
-**Live run status:** executed end to end in GitHub Codespaces on 2026-11-07 (commit `e7531ec`): S0 and all 7 cases behaved as expected, HTML reports and Grafana links verified in the browser. See section 7 and `examples/evidence/v5-live-20261107-e7531ec/`. Screenshots and figures shown in a presentation must come from a recorded run like this one, with its run ID.
+**Live run status:** latest run 2026-11-07 on `564115a` (Codespaces and GitHub Actions), see section 7. Earlier: commit `e7531ec`: S0 and all 7 cases behaved as expected, HTML reports and Grafana links verified in the browser. See section 7 and `examples/evidence/v5-live-20261107-e7531ec/`. Screenshots and figures shown in a presentation must come from a recorded run like this one, with its run ID.
 
 What the demo proves, and what it does not:
 
@@ -98,6 +98,38 @@ Expected exit codes (asserted by the script):
 | wrong_value (optional) | 1 FAIL | 1 FAIL | `OBSERVABILITY_VIOLATION` | 0 | 0 MATCH |
 | metric_count (optional) | 1 FAIL | 1 FAIL | `METRIC_RECONCILIATION_FAILURE` | 0 | 0 MATCH |
 
+### What each report contains (since `188d9ff`)
+
+`report.html` of a run (port 8080, or the CI artifact) has, in this order:
+
+1. **Run summary** and **run overview**: service graph of the run counted from the retrieved spans, journey histogram from Prometheus with clickable exemplars, server latency per service; links to the Grafana service graph, the TraceQL search of the run's traces and the **OAEF — Journey** dashboard filtered on the run.
+2. **Failed checks**, each with links to the trace, the events and the sequence.
+3. **How Jarvis collected and validated this run**: sequence diagram Jarvis → OTel Collector → Tempo / Loki / Prometheus (one exchange per polling attempt) → oracle → evidence bundle. Each exchange is numbered; its expandable detail gives the exact query, time window, records returned, duration, errors and the raw reply file.
+4. **Oracle versus observed**: every check family of the frozen contract with what it expects, how many checks were evaluated, how many failed and the first differences; the contract itself is shown (expandable).
+5. **Derived metrics health**: expected service-graph edges found in Tempo's derived metrics (health only, not the verdict).
+6. **Stability indicators**: emission-to-query delay, polling attempts, time to complete evidence, timeout margin, truncation, slowest transaction against the threshold, with an interpretation (flaky environment or not).
+7. Per examined transaction: scenario steps (expected / observed), business sequence diagram (hover = all attributes and the oracle expectation for that span), **span tree with execution times** (Tempo-like, click a row = that span in Tempo) with the **Tempo URL** in clear, and the span-by-span and event-by-event comparison with the oracle.
+
+### Flaky test or defect?
+
+```bash
+OAEF_REPEAT=3 bash validation/demo/run_v5_demo.sh nominal duplicate
+```
+
+Each case runs N times (`<case>-r1..rN`). The **runs page** (`$OAEF_REPORT_BASE_URL/index.html`, file `stability.json`) classifies each case: **STABLE** (same verdict and same failed checks every time), **FLAKY** with the likely cause (collection/timing when verdicts move with INCONCLUSIVE or slow collection; otherwise non-determinism with complete evidence, to investigate in the product or test data), or **SINGLE RUN**. Injected-fault cases must be STABLE FAIL.
+
+### Dashboards (reusable)
+
+Folder **OAEF** in Grafana, built by `observability/dashboards/build_dashboards.py` (data sources are variables; usable with any Prometheus/Loki/Tempo):
+- **OAEF — Test runs**: verdicts published by Jarvis (`oaef.test.verdict`, after sealing): runs by verdict, failures by class, verdicts over time, a table of runs with links to each journey and report.
+- **OAEF — Journey** (variable `run_id`): service graph, transactions, requests and mean latency per service of the run, journey buckets with exemplars, RED and p95 from Tempo span metrics, the run's traces, business events, verdict.
+
+Check that every panel returns data: `python3 validation/demo/check_dashboards.py --run-id <run_id>`.
+
+### Live CI
+
+`.github/workflows/oaef-v5-live.yml` runs the same cases against the LGTM stack on a GitHub runner (on push to this branch, or manually with `cases` and `repeat` inputs) and uploads the reports, runs page and evidence as the artifact **oaef-v5-reports**. Grafana links in those reports point to the runner and stop resolving after the job; the static diagrams stay readable.
+
 ## 4. Recovery during the session
 
 | Symptom | Likely cause | Action |
@@ -123,11 +155,32 @@ Expected exit codes (asserted by the script):
 - The metric series carries `oaef_run_id` as a label only for this short-lived demo; not a production practice. Exemplars are navigation aids (one per bucket), not evidence of completeness.
 - Report links point to the Codespace's forwarded URLs; they work while the Codespace runs and Tempo/Loki keep the data.
 - Tempo's JSON API returns trace and span IDs base64-encoded and kinds as enum names; the collector normalises both (covered by tests).
+- Tempo's derived service graph counted about 1% fewer calls than sent in run 2 (spans backdated near the 30 s generator limit). Since `188d9ff` live spans are 2–8 s old; the graph is shown as a health check, never as evidence.
 - Pending from the V5 brief: verification-obligation manifest, Weaver registry, the full M01–M17 matrix, slides V5. `report.html` is the single-run view; the Allure report (`allure_report.sh`) is the cross-run view built from the same verdicts. Allure's own trend graphs need its `history/` folder carried between `generate` calls; not set up here.
 
 ## 7. Live run records
 
-### Run 2 — commit `e7531ec` (current procedure)
+### Run 3 — commit `564115a` (investigation report, metrics, dashboards, stability)
+
+Codespaces, 2026-11-07 ~18:30 UTC: `run_v5_demo.sh tests s0 nominal duplicate slow broken_link missing_metric`, then `OAEF_REPEAT=2 … nominal duplicate`. Tests 22/22; S0 PASS; every case as expected.
+
+| Case | Runs | Stability | Verdicts (run_id: verdict, polling attempts) |
+|---|---|---|---|
+| nominal | 3 | STABLE | `s1-3855d0abffdd` PASS 1 · `s1-eb291ebea680` PASS 1 · `s1-08b64d472754` PASS 1 |
+| duplicate | 3 | STABLE | `s1-a6438d48eddf` FAIL 1 · `s1-45ba4bc35039` FAIL 1 · `s1-72b1b88b2bf1` FAIL 1 |
+| slow | 1 | single | `s1-974a85c37a1a` FAIL (`NFR_VIOLATION`) |
+| broken_link | 1 | single | `s1-5d8258cfd9c0` FAIL (`TRACE_CONTEXT_BROKEN`) |
+| missing_metric | 1 | single | `s1-63e6b912f564` INCONCLUSIVE, 21 attempts (90 s timeout): `METRIC-SVC-*-idgenerator` INCONCLUSIVE |
+
+Every nominal run: 20/20 metric checks PASS (journey histogram + 4 services × count and sum reconciled with Tempo server spans). Verdict events published (HTTP 200) for every run.
+
+Dashboards: `check_dashboards.py` first PASS right after the run, then **3 empty Journey panels** 5 minutes later (one-sample run metrics read by instant queries). Fixed in `47eeb47` (`last_over_time` over the dashboard range); re-check PASS. Both outputs are in the evidence folder.
+
+Live CI (GitHub runner, same cases): run 42397492426 on `564115a` **success**, artifact `oaef-v5-reports`. The regression workflow on PR #1 had failed since `e7531ec` because `v5_report.py` used a Python 3.12-only f-string; fixed in `564115a` (22/22 on 3.11.9 and 3.12.7).
+
+Evidence: `examples/evidence/v5-live-20261107-564115a/` (log, runs page `index.html`, `stability.json`, dashboard checks, per run: `report.html`, verdict, query metadata, manifest, hashes).
+
+### Run 2 — commit `e7531ec`
 
 `bash validation/demo/run_v5_demo.sh tests s0 nominal duplicate missing slow broken_link wrong_value metric_count`, GitHub Codespaces (2 CPU, 7 GiB, universal:2, Python 3.12.1), image `grafana/otel-lgtm@sha256:57b5ab1ca6619beb180174e2fccce04762470750669d043f544b4726d0582d07` (Grafana 13.2.3), finished 2026-11-07 17:09 UTC. Tests 14/14 OK. S0 smoke PASS.
 
