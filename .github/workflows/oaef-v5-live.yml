@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      GF_ADMIN_PASSWORD: ci-only-localhost   # ephemeral runner, Grafana bound to 127.0.0.1; not a secret
       OAEF_OUT: ${{ github.workspace }}/oaef-v5
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright/python:v1.49.1-noble   # pinned: scripted screenshots
       OAEF_REPEAT: ${{ github.event.inputs.repeat || '1' }}
       OAEF_CONTRACT: ${{ github.event.inputs.contract || 'legacy' }}
     steps:
@@ -45,6 +45,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Generate a one-time Grafana password for this job (masked, never stored)
+        run: |
+          pw=$(openssl rand -hex 16)
+          echo "::add-mask::$pw"
+          echo "GF_ADMIN_PASSWORD=$pw" >> "$GITHUB_ENV"
       - name: Start the LGTM stack and the report server
         run: |
           bash validation/demo/start_stack.sh
@@ -55,6 +60,16 @@ jobs:
         shell: bash   # -eo pipefail: a failing case fails the job despite the tee
         run: |
           bash validation/demo/run_v5_demo.sh ${{ github.event.inputs.cases || 'tests s0 nominal duplicate missing slow broken_link missing_metric' }} | tee "$OAEF_OUT/demo.log"
+      - name: Build the Allure report over the runs
+        if: always()
+        run: bash validation/demo/allure_report.sh || echo "Allure report not built"
+      - name: Capture screenshots (Playwright script, pinned image)
+        if: always()
+        run: |
+          docker run --rm --network host --ipc host -e GF_ADMIN_PASSWORD -e OAEF_OUT=/w/oaef-v5 -v "$GITHUB_WORKSPACE:/w" -w /w "$PLAYWRIGHT_IMAGE" python3 validation/demo/capture_screens.py --out /w/oaef-v5
+      - name: Rebuild the offline campaign zip with screenshots and Allure
+        if: always()
+        run: python3 validation/v5_export.py "$OAEF_OUT"
       - name: Job summary
         if: always()
         run: |

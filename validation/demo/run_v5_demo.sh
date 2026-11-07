@@ -80,7 +80,7 @@ CASES=("$@"); [ ${#CASES[@]} -eq 0 ] && CASES=(tests nominal duplicate missing s
 for c in "${CASES[@]}"; do
   case "$c" in
     tests)        echo "================ tests ================"
-                  expect "unit and mutation tests (offline, fake backend)" 0 python3 -m unittest discover -s tests ;;
+                  expect "unit and mutation tests (offline, fake backend)" 0 env -u OAEF_CONTRACT python3 -m unittest discover -s tests ;;
     s0)           expect "S0 legacy 7-span smoke (connectivity only)" 0 bash validation/demo/check.sh "$GRAFANA" "$OTLP" ;;
     nominal)      run_case nominal 0 0 ;;
     duplicate)    run_case duplicate 1 1 ;;     # FAIL: EVENT-EXACT-mosip.identity.uin.assigned, TX = 2 vs 1

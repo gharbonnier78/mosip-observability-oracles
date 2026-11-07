@@ -123,6 +123,9 @@ def flatten_traces(trace_docs, problems=None):
                         span['kind'] = KINDS.get(span['kind'], 0)
                     if span.get('parentSpanId'):
                         span['parentSpanId'] = hex_id(span['parentSpanId'], 16)
+                    if span.get('links'):   # span links: Tempo JSON encodes their ids in base64 too
+                        span['links'] = [dict(l_, traceId=hex_id(l_.get('traceId'), 32), spanId=hex_id(l_.get('spanId'), 16))
+                                         for l_ in span['links']]
                     if span['traceId'] != trace_id.lower():
                         msg = (f'Tempo reply for trace {trace_id} contained span {span["spanId"]} with trace id '
                                f'{span.get("traceId")!r}')

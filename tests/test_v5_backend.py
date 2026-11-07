@@ -4,6 +4,7 @@ The fake backend establishes parser/oracle sensitivity, NOT real LGTM integratio
 """
 import base64
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import subprocess
@@ -42,7 +43,9 @@ class MemoryGrafana:
                     kinds = ['SPAN_KIND_UNSPECIFIED', 'SPAN_KIND_INTERNAL', 'SPAN_KIND_SERVER',
                              'SPAN_KIND_CLIENT', 'SPAN_KIND_PRODUCER', 'SPAN_KIND_CONSUMER']
                     spans = [dict(s, kind=kinds[s['kind']],
-                                  **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)})
+                                  **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)},
+                                  **({'links': [{'traceId': b64(l_['traceId']), 'spanId': b64(l_['spanId'])}
+                                                for l_ in s['links']]} if s.get('links') else {}))
                              for s in spans]
                 if self.foreign_span and spans and any(a['value'].get('stringValue') == 'TX-002'
                                                        for a in spans[0]['attributes']):
@@ -313,6 +316,16 @@ class V5BackendTest(unittest.TestCase):
         self.assertIn('f' * 32, meta['backend_errors']['tempo-consistency'][0])
         ok = subprocess.run([sys.executable, str(BACKEND), 'verify-bundle', '--out', str(out)], capture_output=True, text=True)
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
+
+    def test_spec_contract_with_real_tempo_encoding(self):
+        """Spec path against Tempo-style replies (base64 ids, enum kinds, base64 span links): nominal PASS."""
+        os.environ['OAEF_CONTRACT'] = 'spec'
+        try:
+            _, run, proc, v, _ = self.run_sample(tempo_base64=True)
+        finally:
+            os.environ.pop('OAEF_CONTRACT', None)
+        self.assertEqual((run.returncode, proc.returncode), (0, 0), proc.stdout + proc.stderr)
+        self.assertEqual(v['status'], 'PASS')
 
     def test_latency_breach_is_fail_not_inconclusive(self):
         _, run, proc, v, _ = self.run_sample(fault='slow')

@@ -100,6 +100,9 @@ def main(root):
               'Diagrams are embedded and readable offline; Grafana links need the original stack.\n'
               'Each run folder is a sealed evidence bundle: python3 validation/v5_backend.py verify-bundle --out <folder>\n'
               'xray/cucumber.json: Xray Cucumber import (one scenario per run, report attached).\n'
+              'screenshots/ and <run>/screenshots/: Grafana, Tempo, Loki, Prometheus, dashboards, reports and Allure,\n'
+              '  captured by validation/demo/capture_screens.py (Playwright script, after sealing; index.json lists them).\n'
+              'allure-report/: open allure-report/index.html through a web server (e.g. python3 -m http.server).\n'
               'campaign-sha256.json: hash of every file of this zip.\n')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         def add(arc, data):
@@ -112,6 +115,10 @@ def main(root):
             for f in sorted(d.rglob('*')):
                 if f.is_file():
                     add(f'{d.name}/{f.relative_to(d).as_posix()}', f.read_bytes())
+        for sub in ('screenshots', 'allure-report'):   # campaign views (Playwright) and the Allure report, if produced
+            for f in sorted((root / sub).rglob('*')) if (root / sub).is_dir() else []:
+                if f.is_file():
+                    add(f'{sub}/{f.relative_to(root / sub).as_posix()}', f.read_bytes())
         add('xray/cucumber.json', json.dumps(cucumber, indent=1).encode())
         add('scenario/' + Path(FEATURE).name, (ROOT / FEATURE).read_bytes())
         add('scenario/NIN-001-v5-slice.json', (ROOT / 'contracts/NIN-001-v5-slice.json').read_bytes())
