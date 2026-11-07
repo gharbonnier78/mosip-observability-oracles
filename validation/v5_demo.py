@@ -345,6 +345,9 @@ def generate(count, seed, fault, target, out, otlp_url):
 
 
 def verify(out, observed_name='observed.json', verdict_name='verdict.json', check_metrics=True, source=None):
+    if load(out / 'contract.json').get('schema', '').startswith('oaef.contract/v3'):
+        from v5_spec_run import verify_spec   # compiled specification contract (C1)
+        return verify_spec(out, observed_name, verdict_name, check_metrics, source)
     contract = load(out / 'contract.json')
     ledger = load(out / 'ledger.json')
     otlp = load(out / observed_name)
@@ -470,11 +473,17 @@ def main(argv=None):
     run.add_argument('--target', type=int, default=1)
     run.add_argument('--out', type=Path, required=True)
     run.add_argument('--otlp', help='Optional OTLP/HTTP collector base URL')
+    run.add_argument('--contract', choices=['legacy', 'spec'], default=os.environ.get('OAEF_CONTRACT', 'legacy'),
+                     help='spec: compiled specification (generated/contracts); legacy: hand-written V5 slice')
     verify_cmd = sub.add_parser('verify')
     verify_cmd.add_argument('--out', type=Path, required=True)
     args = p.parse_args(argv)
     try:
-        valid = generate(args.count, args.seed, args.fault, args.target, args.out, args.otlp) if args.command == 'run' else verify(args.out)
+        if args.command == 'run' and args.contract == 'spec':
+            from v5_spec_run import generate_spec
+            valid = generate_spec(args.count, args.seed, args.fault, args.target, args.out, args.otlp, emit)
+        else:
+            valid = generate(args.count, args.seed, args.fault, args.target, args.out, args.otlp) if args.command == 'run' else verify(args.out)
     except (ValueError, OSError, KeyError, RuntimeError) as e:
         print('ERROR:', e, file=sys.stderr)
         return 2

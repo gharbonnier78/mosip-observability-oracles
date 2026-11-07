@@ -484,6 +484,21 @@ metrics:
     aggregationTemporality: 2         # CUMULATIVE
     explicitBounds: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
     dataPoint_attributes: [http.request.method, http.route, http.response.status_code, url.scheme, network.protocol.version]
+  run_isolated:                       # S1 demonstrator: one-sample-per-run series, isolated by the oaef_run_id label (demo only, not a production practice)
+    journey_histogram:                # upload -> UIN assignment, one measurement per transaction, exact count reconciled with the run
+      name: "oaef.synthetic.journey.duration"
+      unit: "s"
+      from: EV_PACKET_RECEIVED
+      to: EV_UIN_ASSIGNED
+      explicitBounds: [0.1, 0.25, 0.5, 1, 2, 5, 10]
+      requirements: [NF-08]
+    service_metrics:                  # http.server.request.duration (otlp_shape above) of the run, per server span alias
+      - { alias: PKR_SERVER, per_transaction: 1, requirements: [F-04, NF-08] }
+      - { alias: IDGEN_GET_SERVER, per_transaction: 1, requirements: [F-07, NF-08] }
+      - { alias: IDGEN_PUT_SERVER, per_transaction: 1, requirements: [F-07, NF-08] }
+      - { alias: IDREPO_CREATE_SERVER, per_transaction: 1, requirements: [F-08, NF-08] }
+      - { alias: AUDIT_SERVER, per_transaction: 1, requirements: [F-10, NF-08] }
+    reconcile: "count == transactions x per_transaction; sum == sum of the durations of the alias's spans retrieved from Tempo"
 
 # ---------------------------------------------------------------------------
 # 5. AUDIT — MOSIP audit (kernel-auditmanager, table mosip_audit.app_audit_log) + Loki tenant "audit"
@@ -545,3 +560,45 @@ verdict:
     SILENT_FAILURE: "functional KO and no ERROR span/log for the failing step"
     TEST_DATA_CONFIG: "functional KO with business rejection code mapped to masterdata/partner config"
     PRODUCT_BUG: "functional KO with ERROR span + exception event in a MOSIP service, infra clean"
+
+# ---------------------------------------------------------------------------
+# 8. SCENARIO STEPS — the Gherkin steps of features/nin_001_new_adult_no_hit.feature, with the span aliases,
+#    event names and checks that decide each step (used by reports, Allure and the Xray export).
+# ---------------------------------------------------------------------------
+scenario_steps:
+  - id: STEP-1
+    text: 'When Jarvis uploads "${rid}.zip" with "POST /registrationprocessor/v1/packetreceiver/registrationpackets"'
+    expected: "HTTP 200 from the packet receiver; packet stored and audited; one mosip.registration.packet.received event"
+    requirements: [F-03, F-04, F-10]
+    spans: [ROOT, STEP_UPLOAD, JARVIS_UPLOAD_CLIENT, PKR_SERVER, PKR_DB_INSERT_REGISTRATION, PKR_AUDIT_CLIENT, AUDIT_SERVER, AUDIT_DB_INSERT, PKR_KAFKA_PUBLISH]
+    events: [mosip.registration.packet.received]
+  - id: STEP-2
+    text: "Then the packet goes through the processing stages (upload, validation, classification, CMD and operator validation, demographic and biometric dedupe NO_HIT)"
+    expected: "uploader decrypts and stores the packet; at least 8 stage hops producer -> consumer; one stage.completed event per stage"
+    requirements: [F-04, F-05]
+    spans: [UPLOADER_PROCESS, UPLOADER_DECRYPT, UPLOADER_S3_PUT, STAGE_PROCESS]
+    events: [mosip.registration.stage.completed]
+  - id: STEP-3
+    text: "And exactly one UIN is generated and the identity is created and activated"
+    expected: "one UIN from idgenerator, identity created (<= 3000 ms) and activated with the UIN hash; UIN marked assigned"
+    requirements: [F-07, F-08]
+    spans: [UINGEN_GET_UIN_CLIENT, IDGEN_GET_SERVER, IDREPO_CREATE_SERVER, IDREPO_ENCRYPT_CLIENT, IDREPO_DB_INSERT_UIN, IDGEN_PUT_SERVER]
+    events: [mosip.identity.uin.assigned, mosip.identity.activated]
+  - id: STEP-4
+    text: "And the credential is issued to the verification partners"
+    expected: "credential batch trace linked to the identity creation; WebSub delivery linked to it; one credential.issued event"
+    requirements: [F-08]
+    spans: [LINK_CREDENTIAL_BATCH, LINK_WEBSUB_DELIVERY]
+    events: [mosip.credential.issued]
+  - id: STEP-5
+    text: "And the resident is notified by email or SMS"
+    expected: "mosip.notification.sent within 15 minutes of activation (NF-05)"
+    requirements: [F-09, NF-05]
+    events: [mosip.notification.sent]
+    checks: [OBL-EVENTS-NF-05]
+  - id: STEP-6
+    text: 'And Jarvis observes the external status "PROCESSED" within the window'
+    expected: "status polled 1 to 60 times; upload to activation within 24 h (NF-04)"
+    requirements: [NF-04]
+    spans: [JARVIS_STATUS_POLL]
+    checks: [OBL-EVENTS-NF-04]

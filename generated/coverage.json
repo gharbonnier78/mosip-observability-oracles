@@ -39,7 +39,7 @@
    "oracle_sections": [
     "db.regprc_transactions"
    ],
-   "obligations": 14,
+   "obligations": 15,
    "covered": true
   },
   {
@@ -73,7 +73,7 @@
     "rules.vid",
     "db.idrepo_and_kernel"
    ],
-   "obligations": 9,
+   "obligations": 11,
    "covered": true
   },
   {
@@ -83,7 +83,7 @@
    "oracle_sections": [
     "db"
    ],
-   "obligations": 11,
+   "obligations": 12,
    "covered": true
   },
   {
@@ -103,7 +103,7 @@
    "oracle_sections": [
     "audit"
    ],
-   "obligations": 4,
+   "obligations": 5,
    "covered": true
   },
   {
@@ -203,7 +203,7 @@
     "metrics",
     "audit"
    ],
-   "obligations": 34,
+   "obligations": 40,
    "covered": true
   },
   {

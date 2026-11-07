@@ -3,7 +3,7 @@
  "scenario": "NIN-001",
  "generated_by": "tools/oaef_compile.py",
  "sources": {
-  "oracles/NIN-001.oracle.yaml": "44c31c8f659a2ac0368bf7e66d09b325ebb6d3d8af816b6258b1c192e0cee6e2",
+  "oracles/NIN-001.oracle.yaml": "9886cc879ce634e0c8e3c60d9d88b5be88457513effd39a8da455b07c2dff5c8",
   "models/nin-requirements.md": "53c171bf7fe5125330e3c7582b42adba4d125f12d403e620a672d6c63dd89349",
   "models/nin-enrolment-activity.puml": "053d94636e332cdb2bb56cd31bc8d5fbc3b6a8496825b013282b8ed0a33f2e6d"
  },
@@ -991,6 +991,69 @@
     "url.scheme",
     "network.protocol.version"
    ]
+  },
+  "run_isolated": {
+   "journey_histogram": {
+    "name": "oaef.synthetic.journey.duration",
+    "unit": "s",
+    "from": "EV_PACKET_RECEIVED",
+    "to": "EV_UIN_ASSIGNED",
+    "explicitBounds": [
+     0.1,
+     0.25,
+     0.5,
+     1,
+     2,
+     5,
+     10
+    ],
+    "requirements": [
+     "NF-08"
+    ]
+   },
+   "service_metrics": [
+    {
+     "alias": "PKR_SERVER",
+     "per_transaction": 1,
+     "requirements": [
+      "F-04",
+      "NF-08"
+     ]
+    },
+    {
+     "alias": "IDGEN_GET_SERVER",
+     "per_transaction": 1,
+     "requirements": [
+      "F-07",
+      "NF-08"
+     ]
+    },
+    {
+     "alias": "IDGEN_PUT_SERVER",
+     "per_transaction": 1,
+     "requirements": [
+      "F-07",
+      "NF-08"
+     ]
+    },
+    {
+     "alias": "IDREPO_CREATE_SERVER",
+     "per_transaction": 1,
+     "requirements": [
+      "F-08",
+      "NF-08"
+     ]
+    },
+    {
+     "alias": "AUDIT_SERVER",
+     "per_transaction": 1,
+     "requirements": [
+      "F-10",
+      "NF-08"
+     ]
+    }
+   ],
+   "reconcile": "count == transactions x per_transaction; sum == sum of the durations of the alias's spans retrieved from Tempo"
   }
  },
  "nfr": {
@@ -1300,6 +1363,201 @@
     "expect": "every audit row has a matching AUDIT_SERVER span (same host, |time delta| < 2 s)"
    }
   }
+ },
+ "scenario_steps": [
+  {
+   "id": "STEP-1",
+   "text": "When Jarvis uploads \"${rid}.zip\" with \"POST /registrationprocessor/v1/packetreceiver/registrationpackets\"",
+   "expected": "HTTP 200 from the packet receiver; packet stored and audited; one mosip.registration.packet.received event",
+   "requirements": [
+    "F-03",
+    "F-04",
+    "F-10"
+   ],
+   "spans": [
+    "ROOT",
+    "STEP_UPLOAD",
+    "JARVIS_UPLOAD_CLIENT",
+    "PKR_SERVER",
+    "PKR_DB_INSERT_REGISTRATION",
+    "PKR_AUDIT_CLIENT",
+    "AUDIT_SERVER",
+    "AUDIT_DB_INSERT",
+    "PKR_KAFKA_PUBLISH"
+   ],
+   "events": [
+    "mosip.registration.packet.received"
+   ]
+  },
+  {
+   "id": "STEP-2",
+   "text": "Then the packet goes through the processing stages (upload, validation, classification, CMD and operator validation, demographic and biometric dedupe NO_HIT)",
+   "expected": "uploader decrypts and stores the packet; at least 8 stage hops producer -> consumer; one stage.completed event per stage",
+   "requirements": [
+    "F-04",
+    "F-05"
+   ],
+   "spans": [
+    "UPLOADER_PROCESS",
+    "UPLOADER_DECRYPT",
+    "UPLOADER_S3_PUT",
+    "STAGE_PROCESS"
+   ],
+   "events": [
+    "mosip.registration.stage.completed"
+   ]
+  },
+  {
+   "id": "STEP-3",
+   "text": "And exactly one UIN is generated and the identity is created and activated",
+   "expected": "one UIN from idgenerator, identity created (<= 3000 ms) and activated with the UIN hash; UIN marked assigned",
+   "requirements": [
+    "F-07",
+    "F-08"
+   ],
+   "spans": [
+    "UINGEN_GET_UIN_CLIENT",
+    "IDGEN_GET_SERVER",
+    "IDREPO_CREATE_SERVER",
+    "IDREPO_ENCRYPT_CLIENT",
+    "IDREPO_DB_INSERT_UIN",
+    "IDGEN_PUT_SERVER"
+   ],
+   "events": [
+    "mosip.identity.uin.assigned",
+    "mosip.identity.activated"
+   ]
+  },
+  {
+   "id": "STEP-4",
+   "text": "And the credential is issued to the verification partners",
+   "expected": "credential batch trace linked to the identity creation; WebSub delivery linked to it; one credential.issued event",
+   "requirements": [
+    "F-08"
+   ],
+   "spans": [
+    "LINK_CREDENTIAL_BATCH",
+    "LINK_WEBSUB_DELIVERY"
+   ],
+   "events": [
+    "mosip.credential.issued"
+   ]
+  },
+  {
+   "id": "STEP-5",
+   "text": "And the resident is notified by email or SMS",
+   "expected": "mosip.notification.sent within 15 minutes of activation (NF-05)",
+   "requirements": [
+    "F-09",
+    "NF-05"
+   ],
+   "events": [
+    "mosip.notification.sent"
+   ],
+   "checks": [
+    "OBL-EVENTS-NF-05"
+   ]
+  },
+  {
+   "id": "STEP-6",
+   "text": "And Jarvis observes the external status \"PROCESSED\" within the window",
+   "expected": "status polled 1 to 60 times; upload to activation within 24 h (NF-04)",
+   "requirements": [
+    "NF-04"
+   ],
+   "spans": [
+    "JARVIS_STATUS_POLL"
+   ],
+   "checks": [
+    "OBL-EVENTS-NF-04"
+   ]
+  }
+ ],
+ "required_events": [
+  "mosip.registration.packet.received",
+  "mosip.registration.stage.completed",
+  "mosip.identity.uin.assigned",
+  "mosip.identity.activated",
+  "mosip.credential.issued",
+  "mosip.notification.sent"
+ ],
+ "run_isolated_metrics": {
+  "journey_histogram": {
+   "name": "oaef.synthetic.journey.duration",
+   "unit": "s",
+   "from": "EV_PACKET_RECEIVED",
+   "to": "EV_UIN_ASSIGNED",
+   "explicitBounds": [
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2,
+    5,
+    10
+   ],
+   "requirements": [
+    "NF-08"
+   ]
+  },
+  "service_metrics": [
+   {
+    "alias": "PKR_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-04",
+     "NF-08"
+    ],
+    "service": "regproc-pkr",
+    "method": "POST",
+    "route_re": "^(/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+   },
+   {
+    "alias": "IDGEN_GET_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-07",
+     "NF-08"
+    ],
+    "service": "idgenerator",
+    "method": "GET",
+    "route_re": "^(/v1/idgenerator)?/uin$"
+   },
+   {
+    "alias": "IDGEN_PUT_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-07",
+     "NF-08"
+    ],
+    "service": "idgenerator",
+    "method": "PUT",
+    "route_re": "^(/v1/idgenerator)?/uin$"
+   },
+   {
+    "alias": "IDREPO_CREATE_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-08",
+     "NF-08"
+    ],
+    "service": "idrepo-identity",
+    "method": "POST",
+    "route_re": "^(/idrepository/v1/identity)?/?$"
+   },
+   {
+    "alias": "AUDIT_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-10",
+     "NF-08"
+    ],
+    "service": "auditmanager",
+    "method": "POST",
+    "route_re": "^(/v1/auditmanager)?/audits$"
+   }
+  ],
+  "reconcile": "count == transactions x per_transaction; sum == sum of the durations of the alias's spans retrieved from Tempo"
  },
  "obligations": [
   {
@@ -3543,6 +3801,204 @@
    ],
    "expect": {
     "NFR-SEC-01": "logs.forbidden[1] and no span attribute value equal to ${uin}, ${vid}"
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-journey_histogram",
+   "section": "metrics",
+   "key": "journey_histogram",
+   "requirement_refs": [
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "name": "oaef.synthetic.journey.duration",
+    "unit": "s",
+    "from": "EV_PACKET_RECEIVED",
+    "to": "EV_UIN_ASSIGNED",
+    "explicitBounds": [
+     0.1,
+     0.25,
+     0.5,
+     1,
+     2,
+     5,
+     10
+    ],
+    "requirements": [
+     "NF-08"
+    ]
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-service.PKR_SERVER",
+   "section": "metrics",
+   "key": "service.PKR_SERVER",
+   "requirement_refs": [
+    "F-04",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 26,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Validate integrity, centre / machine / operator, ID schema conformance"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 29,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Reject with reason; notify resident"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "PKR_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-04",
+     "NF-08"
+    ],
+    "service": "regproc-pkr",
+    "method": "POST",
+    "route_re": "^(/registrationprocessor/v1/packetreceiver)?/registrationpackets$"
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-service.IDGEN_GET_SERVER",
+   "section": "metrics",
+   "key": "service.IDGEN_GET_SERVER",
+   "requirement_refs": [
+    "F-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDGEN_GET_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-07",
+     "NF-08"
+    ],
+    "service": "idgenerator",
+    "method": "GET",
+    "route_re": "^(/v1/idgenerator)?/uin$"
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-service.IDGEN_PUT_SERVER",
+   "section": "metrics",
+   "key": "service.IDGEN_PUT_SERVER",
+   "requirement_refs": [
+    "F-07",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 44,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Assign exactly one NIN (11 digits, check digit) and one perpetual VID"
+    },
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDGEN_PUT_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-07",
+     "NF-08"
+    ],
+    "service": "idgenerator",
+    "method": "PUT",
+    "route_re": "^(/v1/idgenerator)?/uin$"
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-service.IDREPO_CREATE_SERVER",
+   "section": "metrics",
+   "key": "service.IDREPO_CREATE_SERVER",
+   "requirement_refs": [
+    "F-08",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "IDREPO_CREATE_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-08",
+     "NF-08"
+    ],
+    "service": "idrepo-identity",
+    "method": "POST",
+    "route_re": "^(/idrepository/v1/identity)?/?$"
+   }
+  },
+  {
+   "obligation_id": "OBL-METRICS-service.AUDIT_SERVER",
+   "section": "metrics",
+   "key": "service.AUDIT_SERVER",
+   "requirement_refs": [
+    "F-10",
+    "NF-08"
+   ],
+   "model_element_refs": [
+    {
+     "model": "models/nin-enrolment-activity.puml",
+     "line": 46,
+     "lane": "Central platform (MOSIP)",
+     "activity": "Activate identity; issue credential to verification partners"
+    }
+   ],
+   "expect": {
+    "alias": "AUDIT_SERVER",
+    "per_transaction": 1,
+    "requirements": [
+     "F-10",
+     "NF-08"
+    ],
+    "service": "auditmanager",
+    "method": "POST",
+    "route_re": "^(/v1/auditmanager)?/audits$"
    }
   }
  ]

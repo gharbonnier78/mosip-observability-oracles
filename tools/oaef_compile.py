@@ -197,6 +197,33 @@ def compile_spec(scenario, rel, requirements, activities):
         obligation('audit', 'app_audit_log', spec['audit'], 'audit')
     for k, v in spec.get('nfr', {}).items():
         obligation('nfr', k, v, f'nfr.{k}')
+    run_iso = metrics.get('run_isolated', {})
+    if run_iso.get('journey_histogram'):
+        obligation('metrics', 'journey_histogram', run_iso['journey_histogram'], 'metrics')
+    resolved_metrics = []
+    for m in run_iso.get('service_metrics', []):
+        if m['alias'] not in known:
+            raise SpecError(f'{rel}: run_isolated metric on unknown alias {m["alias"]}')
+        sp = next(x for x in spans if x['alias'] == m['alias'])
+        service = sp.get('resource', {}).get('service.name')
+        name = sp['name']['$re'] if isinstance(sp.get('name'), dict) else '^' + re.escape(str(sp.get('name'))) + '$'
+        mm = re.match(r'^\^?([A-Z]+) (.*)$', name)
+        route = sp.get('attributes', {}).get('http.route')
+        route_re = route['$re'] if isinstance(route, dict) else ('^' + re.escape(route) + '$' if route else
+                                                                 ('^' + mm.group(2) if mm else None))
+        if not isinstance(service, str) or not mm or not route_re:
+            raise SpecError(f'{rel}: run_isolated metric {m["alias"]}: span needs a literal service and a "METHOD route" name')
+        resolved = dict(m, service=service, method=mm.group(1), route_re=route_re)
+        resolved_metrics.append(resolved)
+        obligation('metrics', f'service.{m["alias"]}', resolved, 'metrics')
+    step_ids = [st['id'] for st in spec.get('scenario_steps', [])]
+    for st in spec.get('scenario_steps', []):
+        bad = [a for a in st.get('spans', []) if a not in known and a not in {l['alias'] for l in spec['traces'].get('links', [])}]
+        bad += [e for e in st.get('events', []) if e not in {x['eventName'] for x in events}]
+        if bad:
+            raise SpecError(f'{rel}: step {st["id"]} refers to unknown aliases or events {bad}')
+    if len(step_ids) != len(set(step_ids)):
+        raise SpecError(f'{rel}: duplicate scenario step ids')
 
     contract = {
         'schema': 'oaef.contract/v3',
@@ -218,6 +245,9 @@ def compile_spec(scenario, rel, requirements, activities):
         'nfr': spec['nfr'],
         'verdict': spec['verdict'],
         'functional': {k: spec.get(k, {}) for k in ('rules', 'api', 'db', 'notification', 'audit')},
+        'scenario_steps': spec.get('scenario_steps', []),
+        'required_events': [e['eventName'] for e in events],
+        'run_isolated_metrics': {**metrics.get('run_isolated', {}), 'service_metrics': resolved_metrics},
         'obligations': obligations,
     }
     return contract

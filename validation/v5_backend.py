@@ -138,7 +138,7 @@ def flatten_traces(trace_docs, problems=None):
 def normalize_loki(doc, run_id):
     if not isinstance(doc, dict) or doc.get('status') != 'success' or doc.get('data', {}).get('resultType') != 'streams':
         raise BackendProblem('Loki did not return a successful stream query')
-    records, malformed, seen = [], [], 0
+    records, malformed, seen, spec_groups = [], [], 0, {}
     for stream in doc['data'].get('result', []):
         for entry in stream.get('values', []):
             seen += 1
@@ -150,6 +150,13 @@ def normalize_loki(doc, run_id):
                 data = json.loads(body)
                 if data.get('run_id') != run_id:
                     malformed.append('foreign_run_or_missing_run_id')
+                    continue
+                if 'service' in data:   # specification simulator: full record in the body
+                    if any(not data.get(k) for k in ('transaction_id', 'trace_id', 'span_id', 'service')):
+                        raise ValueError('missing structured record fields')
+                    from v5_spec_run import records_from_loki_body
+                    svc, rec = records_from_loki_body(data, ts)
+                    spec_groups.setdefault(svc, []).append(rec)
                     continue
                 must = ('transaction_id', 'event_name', 'trace_id', 'span_id', 'synthetic_effect_id')
                 if any(not data.get(k) for k in must):
@@ -163,6 +170,10 @@ def normalize_loki(doc, run_id):
                                     'oaef.synthetic.effect.id': data['synthetic_effect_id']})})
             except (TypeError, ValueError, KeyError, json.JSONDecodeError) as ex:
                 malformed.append(f'malformed_structured_event:{type(ex).__name__}')
+    if spec_groups:
+        return ({'resourceLogs': [{'resource': {'attributes': attrs({'service.name': svc})},
+                                   'scopeLogs': [{'logRecords': rows}]} for svc, rows in sorted(spec_groups.items())]},
+                malformed, seen)
     return ({'resourceLogs': [{'resource': {'attributes': attrs({'service.name': 'oaef-s1-simulator'})},
                                 'scopeLogs': [{'logRecords': records}]}]}, malformed, seen)
 
@@ -407,13 +418,29 @@ def re_evaluate(out):
     prom_file = out / 'backend-raw/prometheus.json'
     series = parse_prometheus(load(prom_file), manifest['run_id']) if prom_file.exists() else {}
     svc_file = out / 'backend-raw/prometheus-services.json'
-    svc_obs = parse_service_metrics(load(svc_file), manifest['run_id']) if svc_file.exists() else {}
-    metric_checks = (observed_metric_checks(series, contract, ledger)
-                     + service_checks(svc_obs, contract, ledger, load(out / 'collected-otel.json')))
-    result = classify(base, meta['returned_trace_count'], len(ledger),
-                      meta['parsed_log_records'], len(ledger) * len(contract['required_events']),
-                      meta['backend_errors'], meta['parse_errors'],
-                      meta['loki_truncated_possible'], metric_checks)
+    spec = contract.get('schema', '').startswith('oaef.contract/v3')
+    if spec:
+        from v5_spec_run import journey_prom_checks, metric_checks_spec, series_from_prometheus
+        from v5_sim_spec import normalise
+        col = load(out / 'collected-otel.json')
+        metric_checks = (journey_prom_checks(contract, ledger, series)
+                         + metric_checks_spec(contract, ledger, normalise(col['traces'], {'resourceLogs': []})[0],
+                                              series_from_prometheus(load(svc_file) if svc_file.exists() else None,
+                                                                     manifest['run_id'])))
+    else:
+        svc_obs = parse_service_metrics(load(svc_file), manifest['run_id']) if svc_file.exists() else {}
+        metric_checks = (observed_metric_checks(series, contract, ledger)
+                         + service_checks(svc_obs, contract, ledger, load(out / 'collected-otel.json')))
+    if spec:
+        from v5_spec_run import classify_spec
+        result, _ = classify_spec(base['failures'], metric_checks, meta['backend_errors'], meta['returned_trace_count'],
+                                  meta['queried_trace_count'], meta['parsed_log_records'], expected['events_expected'],
+                                  meta['parse_errors'], meta['loki_truncated_possible'])
+    else:
+        result = classify(base, meta['returned_trace_count'], len(ledger),
+                          meta['parsed_log_records'], len(ledger) * len(contract['required_events']),
+                          meta['backend_errors'], meta['parse_errors'],
+                          meta['loki_truncated_possible'], metric_checks)
     same = (result == expected['status'] and
             metric_checks == expected['metric_checks'] and
             base['failures'] == expected['event_span_failures'])
@@ -434,15 +461,20 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
     snapshot_hash = hashlib.sha256((out / 'contract.json').read_bytes()).hexdigest()
     if snapshot_hash != manifest.get('contract_snapshot_sha256'):
         raise BackendProblem('Frozen contract snapshot hash differs from the run manifest')
-    if contract['metric_name'].replace('.', '_') != METRIC_PREFIX or contract['metric_unit'] != 's':
+    spec = contract.get('schema', '').startswith('oaef.contract/v3')
+    metric = contract['run_isolated_metrics']['journey_histogram'] if spec else \
+        {'name': contract['metric_name'], 'unit': contract['metric_unit']}
+    if metric['name'].replace('.', '_') != METRIC_PREFIX or metric['unit'] != 's':
         raise BackendProblem('S1 metrics adapter does not support this contract metric/version')
     run_id = manifest['run_id']
     source_spans = [s for g in emitted['traces']['resourceSpans'] for sc in g['scopeSpans'] for s in sc['spans']]
     log_services = sorted({av(g['resource']['attributes'])['service.name'] for g in emitted['logs']['resourceLogs']})
     selector = '{service_name=~"' + '|'.join(log_services) + '"}'
     trace_ids = sorted({s['traceId'] for s in source_spans})
-    if len(trace_ids) != len(ledger):
+    if not spec and len(trace_ids) != len(ledger):
         raise BackendProblem('One source trace per transaction required for this slice')
+    emitted_records = sum(len(sc['logRecords']) for g in emitted['logs']['resourceLogs'] for sc in g['scopeLogs'])
+    expected_records = emitted_records if spec else len(ledger) * len(contract['required_events'])
     starts = [int(s['startTimeUnixNano']) for s in source_spans]
     ends = [int(s['endTimeUnixNano']) for s in source_spans]
     start_ns = min(starts) - 10_000_000_000
@@ -481,7 +513,7 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
                 'query': selector + ' |= "' + run_id + '"', 'start': str(start_ns), 'end': str(end_ns),
                 'limit': str(limit), 'direction': 'forward'})
             log_otlp, malformed, seen = normalize_loki(loki_doc, run_id)
-            log_count = len(log_otlp['resourceLogs'][0]['scopeLogs'][0]['logRecords'])
+            log_count = sum(len(sc['logRecords']) for g in log_otlp['resourceLogs'] for sc in g['scopeLogs'])
         except BackendProblem as ex:
             errors['loki'] = str(ex)
             loki_doc, log_otlp, malformed, seen, log_count = None, None, ['loki_unavailable'], 0, 0
@@ -508,14 +540,21 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
                              'error': errors.get('prometheus') or errors.get('prometheus-services')}
         trace_count = sum(bool(doc) for doc in trace_docs.values())
         tempo_problems = []
-        metric_checks = (observed_metric_checks(series, contract, ledger)
-                         + service_checks(svc_obs, contract, ledger, {'traces': flatten_traces(trace_docs, tempo_problems)}
-                                          if trace_count else None))
+        if spec:
+            from v5_spec_run import journey_prom_checks, metric_checks_spec, series_from_prometheus
+            from v5_sim_spec import normalise
+            got = normalise(flatten_traces(trace_docs, tempo_problems), {'resourceLogs': []})[0] if trace_count else []
+            metric_checks = (journey_prom_checks(contract, ledger, series)
+                             + metric_checks_spec(contract, ledger, got, series_from_prometheus(svc_doc, run_id)))
+        else:
+            metric_checks = (observed_metric_checks(series, contract, ledger)
+                             + service_checks(svc_obs, contract, ledger, {'traces': flatten_traces(trace_docs, tempo_problems)}
+                                              if trace_count else None))
         if tempo_problems:
             errors['tempo-consistency'] = tempo_problems[:5]
         row['tempo']['inconsistent_spans'] = len(tempo_problems)
         ready = (not errors and trace_count == len(trace_ids) and
-                 log_count >= len(ledger) * len(contract['required_events']) and
+                 log_count >= expected_records and
                  all(c['status'] != 'INCONCLUSIVE' for c in metric_checks))
         row['complete'] = ready
         attempt_log.append(row)
@@ -573,19 +612,25 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
     verify(out, observed_name='collected-otel.json', verdict_name='collected-verdict.json',
            check_metrics=False, source='actually queried Grafana/Tempo/Loki records, synthetic S1')
     base = load(out / 'collected-verdict.json')
-    status = classify(base, trace_count, len(trace_ids), log_count,
-                      len(ledger) * len(contract['required_events']), errors, malformed,
-                      seen >= limit, metric_checks)
+    if spec:
+        from v5_spec_run import classify_spec
+        status, classes = classify_spec(base['failures'], metric_checks, errors, trace_count, len(trace_ids), log_count,
+                                        expected_records, malformed, seen >= limit)
+    else:
+        status = classify(base, trace_count, len(trace_ids), log_count,
+                          len(ledger) * len(contract['required_events']), errors, malformed,
+                          seen >= limit, metric_checks)
+        classes = diagnostic_classes(status, base['failures'], metric_checks)
     verdict = {'run_id': run_id, 'mode': 'S1_BACKEND_OBSERVATION', 'status': status,
                'business_sut_verified': False, 'backend_ingestion_verified': status == 'PASS',
                'transaction_count': len(ledger), 'trace_count': trace_count,
-               'events_expected': len(ledger) * len(contract['required_events']),
+               'events_expected': expected_records,
                'events_collected': log_count, 'event_span_failures': base['failures'],
                'metric_checks': metric_checks,
                'derived_metrics_health': graph,
                'evidence_sufficiency': 'SUFFICIENT_FOR_S1' if status != 'INCONCLUSIVE' else 'INSUFFICIENT',
-               'classification': diagnostic_classes(status, base['failures'], metric_checks)[0],
-               'diagnostic_classes': diagnostic_classes(status, base['failures'], metric_checks),
+               'classification': classes[0],
+               'diagnostic_classes': classes,
                'collected_artifact': 'collected-otel.json', 'backend_query_provenance': 'backend-meta.json'}
     dump(out / 'backend-verdict.json', verdict)
     report = [f'# OAEF V5 — backend observation for {run_id}', '',

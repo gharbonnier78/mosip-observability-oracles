@@ -88,8 +88,9 @@ def sequence_svg(spans, events_count, failed_refs, contract, links):
     their outputs; Kafka hops (producer -> consumer) an open-headed asynchronous arrow; business
     events a square on the emitting service, coloured by how many times they were found in Loki.
     """
-    expected = {(e['service'], e['name'], e['kind']): e['id'] for e in contract['journey_spans']}
-    expected_by_id = {e['id']: e for e in contract['journey_spans']}
+    expected = {(e['service'], e['name'], e['kind']): e['id'] for e in contract.get('journey_spans', [])}
+    expected_by_id = {e['id']: e for e in contract.get('journey_spans', [])}
+    expected_by_id.update({e['alias']: {'parent': e.get('parent') or e.get('parent_ancestor')} for e in contract.get('spans', [])})
     by_id = {s['spanId']: s for s in spans}
     kind = lambda s: s['kind'] if isinstance(s['kind'], int) else KINDS.get(s['kind'], 0)
     has_remote_child = {s.get('parentSpanId') for s in spans
@@ -120,7 +121,7 @@ def sequence_svg(spans, events_count, failed_refs, contract, links):
     for t, _, what, s in items:
         k = kind(s)
         attrs = av(s['attributes'])
-        sid = expected.get((s['_svc'], s['name'], k), '?')
+        sid = s.get('_alias') or expected.get((s['_svc'], s['name'], k), '?')
         bad = sid in failed_refs or s['name'] in failed_refs
         color = '#c62828' if bad else '#263238'
         link = esc(links.trace(s['traceId'], s['spanId']))
@@ -212,7 +213,7 @@ def waterfall_svg(spans, failed_refs, contract, links):
     """Span tree with execution times (Tempo-like trace view), drawn from retrieved spans."""
     if not spans:
         return ''
-    expected = {(e['service'], e['name'], e['kind']): e['id'] for e in contract['journey_spans']}
+    expected = {(e['service'], e['name'], e['kind']): e['id'] for e in contract.get('journey_spans', [])}
     by_id = {s['spanId']: s for s in spans}
     children, roots = {}, []
     for s in sorted(spans, key=lambda s: int(s['startTimeUnixNano'])):
@@ -237,7 +238,7 @@ def waterfall_svg(spans, failed_refs, contract, links):
     rows = []
     for i, (s, depth) in enumerate(order):
         y = 40 + i * row_h
-        sid = expected.get((s['_svc'], s['name'], _kind(s)), '?')
+        sid = s.get('_alias') or expected.get((s['_svc'], s['name'], _kind(s)), '?')
         orphan = bool(s.get('parentSpanId')) and s['parentSpanId'] not in by_id
         bad = sid in failed_refs or s['name'] in failed_refs or orphan
         st, en = int(s['startTimeUnixNano']) - t0, int(s['endTimeUnixNano']) - t0
@@ -361,6 +362,12 @@ def flakiness(manifest, meta, collected_v):
             ('Loki result possibly truncated', str(meta.get('loki_truncated_possible'))),
             ('Backend errors', json.dumps(meta.get('backend_errors') or {}))]
     m = collected_v.get('margins', {})
+    if m.get('budget_ms') and m.get('max_identity_creation_ms') is not None:
+        ratio = m['max_identity_creation_ms'] / m['budget_ms']
+        rows.append(('Slowest identity creation / span budget (spec NFR)',
+                     f'{m["max_identity_creation_ms"]} ms / {m["budget_ms"]} ms ({ratio:.0%})'))
+        if 0.9 <= ratio <= 1.0:
+            notes.append('Identity creation within 10% of its budget: the NFR verdict may flip on a rerun.')
     if m.get('threshold_ms'):
         ratio = m['max_upload_to_assignment_ms'] / m['threshold_ms']
         rows.append(('Slowest transaction / latency threshold',
@@ -387,6 +394,8 @@ def flakiness(manifest, meta, collected_v):
 
 def oracle_view(contract, collected_v, backend):
     """The oracle as executed: every check family, what it expects, how many were evaluated and failed."""
+    if contract.get('schema', '').startswith('oaef.contract/v3'):
+        return oracle_view_spec(contract, collected_v, backend)
     rows = []
     for fam, v in collected_v.get('evaluated', {}).items():
         st = 'PASS' if v['failed'] == 0 else 'FAIL'
@@ -415,8 +424,10 @@ def oracle_view(contract, collected_v, backend):
             + '\n\nscenario_steps:\n' + esc(json.dumps(contract['scenario_steps'], indent=1)) + '</pre></details>')
 
 
-def span_comparison(tx_spans, tx_logs, contract, entry):
+def span_comparison(tx_spans, tx_logs, contract, entry, failures=()):
     """Expected span tree and events of one transaction against what was retrieved."""
+    if contract.get('schema', '').startswith('oaef.contract/v3'):
+        return span_comparison_spec(tx_spans, tx_logs, contract, entry, failures)
     by_key = {}
     for s in tx_spans:
         by_key.setdefault((s['_svc'], s['name'], _kind(s)), []).append(s)
@@ -475,7 +486,8 @@ def service_graph_svg(spans, links):
     def d(n, seen=()):
         if n in depth:
             return depth[n]
-        depth[n] = 0 if not incoming[n] else 1 + max(d(a, seen + (n,)) for a in incoming[n] if a not in seen)
+        depth[n] = 0   # provisional value breaks cycles (Kafka stages loop back to the first group)
+        depth[n] = 0 if not incoming[n] else 1 + max((d(a, seen + (n,)) for a in incoming[n] if a not in seen), default=-1)
         return depth[n]
     for n in nodes:
         d(n)
@@ -562,6 +574,71 @@ def service_latency_table(spans):
     return ''.join(out) + '</table>'
 
 
+def oracle_view_spec(contract, collected_v, backend):
+    """Specification obligations as executed: requirements, evaluated / failed / not evaluated, first differences."""
+    obl = {o['obligation_id']: o for o in contract['obligations']}
+    rows = []
+    fails = collected_v.get('failures', [])
+    for oid, v in sorted(collected_v.get('evaluated', {}).items()):
+        o = obl.get(oid, {})
+        st = 'NOT_EVALUATED' if not v['evaluated'] else ('PASS' if v['failed'] == 0 else 'FAIL')
+        badge = {'NOT_EVALUATED': 'INCONCLUSIVE'}.get(st, st)
+        diff = '<br>'.join(f'{esc(f.get("transaction_id") or "run")}: <code>{esc(f["check_id"].split(":")[-1])}</code> expected '
+                           f'<code>{esc(json.dumps(f["expected"]))[:120]}</code> &rarr; observed <code>{esc(json.dumps(f["actual"]))[:160]}</code>'
+                           + (f' <i>(consequence of {esc(f["consequence_of"])})</i>' if f.get('consequence_of') else '')
+                           for f in fails if f.get('obligation_id') == oid)
+        rows.append(f'<tr><td><code>{esc(oid)}</code></td><td>{esc(o.get("section", ""))}</td>'
+                    f'<td>{esc(", ".join(o.get("requirement_refs", [])))}</td><td>{v["evaluated"]}</td><td>{v["failed"]}</td>'
+                    f'<td>{v.get("not_evaluated", 0)}</td><td><span class="badge {badge}">{st}</span></td><td>{diff}</td></tr>')
+    return ('<p>Each line is an obligation of the compiled specification (<code>generated/contracts/' + esc(contract['scenario'])
+            + '.contract.json</code>, from <code>' + esc(', '.join(contract.get('sources', {}))) + '</code>). '
+            'NOT_EVALUATED = not executable yet (REST, DB, audit, notification, spec metrics: increments C2, C3, C5); '
+            'never counted as passed.</p><table><tr><th>Obligation</th><th>Section</th><th>Requirements</th><th>Evaluated</th>'
+            '<th>Failed</th><th>Not evaluated</th><th>Result</th><th>Differences</th></tr>' + ''.join(rows) + '</table>'
+            '<details><summary>Show the oracle (compiled specification contract)</summary><pre>'
+            + esc(json.dumps({k: contract[k] for k in ('schema', 'scenario', 'sources', 'variables', 'settle', 'nfr')
+                              if k in contract}, indent=1))
+            + '\n\nspans:\n' + esc(json.dumps(contract.get('spans', []), indent=1))
+            + '\n\nevents:\n' + esc(json.dumps(contract.get('events', {}), indent=1)) + '</pre></details>')
+
+
+def span_comparison_spec(tx_spans, tx_logs, contract, entry, failures):
+    """Per specification alias and event: found, verdict, failure reasons (with causes) for one transaction."""
+    found = {}
+    for s in tx_spans:
+        if s.get('_alias'):
+            found.setdefault(s['_alias'], []).append(s)
+    by_ref = {}
+    for f in failures:
+        by_ref.setdefault(f.get('ref'), []).append(f)
+    rows = []
+    for sp in contract.get('spans', []) + contract.get('links', []):
+        a = sp['alias']
+        fl = by_ref.get(a, [])
+        style = '' if not fl else ' style="background:#ffebee"'
+        why = '; '.join(f'{f["check_id"].split(":")[-1]}' + (f' (consequence of {f["consequence_of"]})' if f.get('consequence_of') else '')
+                        for f in fl)
+        res = sp.get('resource', {}).get('service.name', '')
+        rows.append(f'<tr{style}><td>{esc(a)}</td><td>{esc(res if isinstance(res, str) else json.dumps(res))}</td>'
+                    f'<td>{esc(json.dumps(sp.get("name", sp.get("span", ""))))[:90]}</td>'
+                    f'<td>{esc(", ".join(o for o in sp.get("requirements", [])))}</td><td>x{len(found.get(a, []))}</td>'
+                    f'<td>{"FAIL: " + esc(why) if fl else "ok"}</td></tr>')
+    ev_rows = []
+    for e in contract.get('events', {}).get('expected_ordered_subsequence', []):
+        n = sum(1 for r in tx_logs if r.get('eventName') == e['eventName'])
+        fl = by_ref.get(e['eventName'], [])
+        style = '' if not fl else ' style="background:#ffebee"'
+        ev_rows.append(f'<tr{style}><td>{esc(e["eventName"])}</td><td>{esc(json.dumps(e.get("count", 1)))}</td><td>x{n}</td>'
+                       f'<td>{esc(json.dumps(e.get("attributes", {})))[:120]}</td>'
+                       f'<td>{"FAIL: " + esc("; ".join(f["check_id"].split(":")[-1] for f in fl)) if fl else "ok"}</td></tr>')
+    return ('<details><summary>Oracle versus observed for this transaction: '
+            f'{len(contract.get("spans", []))} span aliases + {len(contract.get("links", []))} links, '
+            f'{len(ev_rows)} business events (compiled specification)</summary>'
+            '<table><tr><th>Alias</th><th>Service</th><th>Name (spec)</th><th>Requirements</th><th>Found</th><th>Result</th></tr>'
+            + ''.join(rows) + '</table><table><tr><th>Event</th><th>Expected count</th><th>Found in Loki</th>'
+            '<th>Expected attributes</th><th>Result</th></tr>' + ''.join(ev_rows) + '</table></details>')
+
+
 CSS = """
 body{font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif;margin:0;padding:24px;color:#1c2833;background:#fafbfc}
 h1{font-size:22px;margin:0 0 4px} h2{font-size:17px;margin:28px 0 8px} h3{font-size:15px;margin:18px 0 6px}
@@ -612,7 +689,8 @@ def write_report(out, grafana_public, uids):
          '<h2>Run summary</h2><table><tr><th>Signal</th><th>Expected</th><th>Collected</th><th>Investigate</th></tr>',
          f'<tr><td>Traces (1 per transaction)</td><td>{len(ledger)}</td><td>{backend["trace_count"]}</td>'
          f'<td>{a(links.trace(next(iter(sorted({s["traceId"] for s in spans})), "")), "open one trace") if spans else ""}</td></tr>',
-         f'<tr><td>Spans ({len(contract["journey_spans"])} per transaction)</td>'
+         f'<tr><td>Spans ({len(contract["journey_spans"]) if "journey_spans" in contract else len(contract.get("spans", []))} '
+         f'{"per transaction" if "journey_spans" in contract else "specified aliases"})</td>'
          f'<td>{collected_v.get("count_expected_spans", "")}</td><td>{collected_v.get("count_observed_spans", len(spans))}</td><td></td></tr>',
          f'<tr><td>Business events ({len(contract["required_events"])} per transaction)</td>'
          f'<td>{backend["events_expected"]}</td><td>{backend["events_collected"]}</td>'
@@ -669,13 +747,18 @@ def write_report(out, grafana_public, uids):
                      for g in graph) + '</table>' + a(links.service_graph(), 'open the service graph in Grafana'))
     h.append('<h2>Stability indicators (flaky test or product?)</h2>' + flakiness(manifest, meta, collected_v))
     entries = {x['transaction_id']: x for x in ledger}
+    span_alias = collected_v.get('span_aliases', {})
+    for s_ in spans:
+        if s_['spanId'] in span_alias:
+            s_['_alias'] = span_alias[s_['spanId']]
     for tx in shown:
         tx_spans = [s for s in spans if tx_of(s) == tx]
         tx_logs = [r for r in logs if tx_of(r) == tx]
         tx_fail = [f for f in failures if f.get('transaction_id') == tx]
         counts = {}
         for r in tx_logs:
-            counts[r['eventName']] = counts.get(r['eventName'], 0) + 1
+            if r.get('eventName'):   # business events only; plain logs have none
+                counts[r['eventName']] = counts.get(r['eventName'], 0) + 1
         refs = {f.get('ref') for f in tx_fail if f.get('ref')}
         ok = 'FAIL' if tx_fail else 'PASS'
         trace_id = tx_spans[0]['traceId'] if tx_spans else ''
@@ -702,7 +785,7 @@ def write_report(out, grafana_public, uids):
             h.append('<h3>Span tree with execution times (as in Tempo; click a row to open that span)</h3>'
                      f'<div class="wrap">{waterfall_svg(tx_spans, refs, contract, links)}</div>'
                      f'<div class="url">Tempo: <a href="{esc(url)}" target="_blank" rel="noopener">{esc(url)}</a></div>')
-        h.append(span_comparison(tx_spans, tx_logs, contract, entries[tx]))
+        h.append(span_comparison(tx_spans, tx_logs, contract, entries[tx], tx_fail))
     h.append('<h2>Evidence files</h2><ul>' + ''.join(
         f'<li><a href="{f}">{f}</a></li>' for f in FILES if (out / f).exists()) + '</ul>')
     h.append(f'<p>Scenario source: <code>{esc(contract.get("scenario_source", ""))}</code> · contract '

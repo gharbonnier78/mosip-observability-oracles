@@ -139,12 +139,13 @@ class Evaluator:
         self.obl = {o['obligation_id']: o for o in contract['obligations']}
         self.results = []
 
-    def add(self, check_id, obligation_id, ok, expected, actual, tx, ref=None, status=None):
+    def add(self, check_id, obligation_id, ok, expected, actual, tx, ref=None, status=None, consequence_of=None):
         o = self.obl.get(obligation_id, {})
         self.results.append({'check_id': check_id, 'obligation_id': obligation_id, 'transaction_id': tx,
                              'requirement_refs': o.get('requirement_refs', []),
                              'status': status or ('PASS' if ok else 'FAIL'), 'expected': expected,
-                             'actual': actual, **({'ref': ref} if ref else {})})
+                             'actual': actual, **({'ref': ref} if ref else {}),
+                             **({'consequence_of': consequence_of} if consequence_of and not ok else {})})
         return ok
 
     # ---------------------------------------------------------------- spans
@@ -232,7 +233,11 @@ class Evaluator:
                 cands = [s for s in cands if int(s['startTimeUnixNano']) >= start]
         cnt = spec.get('count')
         ok = count_ok(cnt, len(cands))
-        if not ok and not cands and by_attr:
+        cause = next((spec[k] for k in ('parent', 'parent_ancestor', 'after') if spec.get(k) and not matched.get(spec[k])), None)
+        if not ok and cause:
+            self.add(f'{oid}:parent' if by_attr else f'{oid}:count', oid, False, cnt if cnt is not None else 1, len(cands),
+                     tx, alias, consequence_of=f'OBL-TRACES-{cause}')
+        elif not ok and not cands and by_attr:
             orphan = [s['spanId'] for s in by_attr if s.get('parentSpanId') and s['parentSpanId'] not in by_id]
             self.add(f'{oid}:parent', oid, False,
                      {k: spec[k] for k in ('parent', 'parent_ancestor', 'parent_kind', 'parent_kind_ancestor', 'after') if k in spec},
@@ -306,7 +311,12 @@ class Evaluator:
                     ok = any(l_.get('traceId') == ctx.get('trace.T2') for l_ in links)
                 if ok:
                     cands.append(s)
-            self.add(f'{oid}:present', oid, len(cands) == 1, 'one root span linked as specified', len(cands), tx, ln['alias'])
+            missing_target = ln.get('link_to') and not target
+            missing_t2 = not ln.get('link_to') and not ctx.get('trace.T2')
+            cause = (f'OBL-TRACES-{ln["link_to"]}' if missing_target else
+                     'OBL-TRACES-LINK_CREDENTIAL_BATCH' if missing_t2 else None)
+            self.add(f'{oid}:present', oid, len(cands) == 1, 'one root span linked as specified', len(cands), tx,
+                     ln['alias'], consequence_of=cause)
             for s in cands:
                 ctx['trace.' + ln.get('trace', 'T?')] = s['traceId']
                 for k, v in ln.get('attributes', {}).items():
@@ -354,11 +364,16 @@ class Evaluator:
                         reasons.append(f'spanId not of {spec["span_of"]}')
                 reasons = [x for x in reasons if x]
                 if reasons:
-                    self.add(f'{oid}:values', oid, False, spec.get('attributes'), reasons[:3], tx, spec['eventName'])
+                    cause = (f'OBL-TRACES-{spec["span_of"]}' if spec.get('span_of') and not matched.get(spec['span_of'])
+                             else None)
+                    self.add(f'{oid}:values', oid, False, spec.get('attributes'), reasons[:3], tx, spec['eventName'],
+                             consequence_of=cause)
                 else:
                     sel_ok.append(r)
+            no_trace = spec.get('trace') and spec['trace'] != 'T1' and not trace
             self.add(f'{oid}:count', oid, count_ok(spec.get('count'), len(sel)),
-                     spec.get('count', 1), len(sel), tx, spec['eventName'])
+                     spec.get('count', 1), len(sel), tx, spec['eventName'],
+                     consequence_of=f'trace {spec["trace"]} not found' if no_trace else None)
             if sel:
                 first = min(int(r['timeUnixNano']) for r in sel)
                 times[spec['alias']] = (first, max(int(r['timeUnixNano']) for r in sel))
@@ -423,6 +438,8 @@ class Evaluator:
     def not_evaluated(self, tx):
         for o in self.c['obligations']:
             inc = NOT_IN_C1.get(o['section'])
+            if o['section'] == 'metrics' and (o['key'] == 'journey_histogram' or str(o['key']).startswith('service.')):
+                inc = None   # run-isolated metrics: reconciled by the demonstrator (v5_demo / v5_backend)
             if inc:
                 self.add(f'{o["obligation_id"]}:pending', o['obligation_id'], False, o['section'],
                          f'not executable before {inc}', tx, status='NOT_EVALUATED')

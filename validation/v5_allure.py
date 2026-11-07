@@ -103,7 +103,8 @@ def write_allure(out, grafana_public, uids):
         tx_fail = [f for f in failures if f.get('transaction_id') == tx]
         counts = {}
         for r in tx_logs:
-            counts[r['eventName']] = counts.get(r['eventName'], 0) + 1
+            if r.get('eventName'):   # business events only; plain logs have none
+                counts[r['eventName']] = counts.get(r['eventName'], 0) + 1
         refs = {f.get('ref') for f in tx_fail if f.get('ref')}
         if tx_spans:
             start = min(int(s['startTimeUnixNano']) for s in tx_spans) // 1_000_000
@@ -139,6 +140,8 @@ def write_allure(out, grafana_public, uids):
             result['statusDetails'] = {'message': f'[{classes[0]}] ' + '; '.join(check_text(f) for f in tx_fail),
                                        'trace': json.dumps(tx_fail, indent=2)}
         if tx_spans:
+            for s_ in tx_spans:   # specification contract: aliases resolved by the oracle engine
+                s_.setdefault('_alias', collected_v.get('span_aliases', {}).get(s_['spanId']))
             svg = sequence_svg(tx_spans, counts, refs, contract, links).replace('<defs>', SVG_STYLE + '<defs>', 1)
             src = uid + '-sequence-attachment.svg'
             (res / src).write_text(svg, encoding='utf-8')

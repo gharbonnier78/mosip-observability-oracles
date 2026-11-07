@@ -78,7 +78,8 @@ class MemoryGrafana:
                     svc = next(a['value']['stringValue'] for a in g['resource']['attributes'] if a['key'] == 'service.name')
                     for dp in g['scopeMetrics'][0]['metrics'][0]['histogram']['dataPoints']:
                         lab = {a['key']: next(iter(a['value'].values())) for a in dp['attributes']}
-                        base = {'service_name': svc, 'http_route': lab['http.route'], 'oaef_run_id': lab['oaef.run.id']}
+                        base = {'service_name': svc, 'http_route': lab['http.route'], 'oaef_run_id': lab['oaef.run.id'],
+                                'http_request_method': lab.get('http.request.method', '')}
                         rows.append({'metric': dict(base, __name__='http_server_request_duration_seconds_count'),
                                      'value': [1800000000, str(dp['count'])]})
                         rows.append({'metric': dict(base, __name__='http_server_request_duration_seconds_sum'),
