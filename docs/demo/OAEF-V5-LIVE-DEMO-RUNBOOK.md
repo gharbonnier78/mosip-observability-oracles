@@ -126,6 +126,13 @@ Folder **OAEF** in Grafana, built by `observability/dashboards/build_dashboards.
 
 Check that every panel returns data: `python3 validation/demo/check_dashboards.py --run-id <run_id>`.
 
+### Offline campaign zip and Xray import
+
+At the end of `run_v5_demo.sh` (and in the live CI), `validation/v5_export.py` writes `$OAEF_OUT/exports/oaef-v5-campaign-<UTC>.zip`:
+`index.html` (runs and stability), every run folder (`report.html` + full sealed evidence bundle), the executed scenario and contract, `xray/cucumber.json` and `campaign-sha256.json` (hash of every file in the zip). Download it from the Codespace (port 8080, folder `exports/`) or from the CI artifact **oaef-v5-campaign-zip**. Offline, the reports and diagrams are complete; Grafana links need the original stack. Each run folder can still be checked: `python3 validation/v5_backend.py verify-bundle --out <folder>`.
+
+**Xray (Cucumber import)**: import `xray/cucumber.json` as Cucumber results (Xray: *Import Execution Results* → Cucumber, or the Xray REST endpoint for Cucumber results). One scenario per run, named after the case (`NIN-001 [duplicate] …`), so repeated runs update the same Test; steps = the contract's scenario steps with their observed status and the failed checks as error message; the run's `report.html` and verdict are attached to the last step. INCONCLUSIVE runs end with a *pending* step, never *passed*. To bind scenarios to existing Xray Tests, set `OAEF_XRAY_TEST_KEYS="none=PRJ-12,duplicate=PRJ-13"` before the run (adds the `@PRJ-12` tag). Check your Xray import settings for how untagged scenarios are matched or created.
+
 ### Live CI
 
 `.github/workflows/oaef-v5-live.yml` runs the same cases against the LGTM stack on a GitHub runner (on push to this branch, or manually with `cases` and `repeat` inputs) and uploads the reports, runs page and evidence as the artifact **oaef-v5-reports**. Grafana links in those reports point to the runner and stop resolving after the job; the static diagrams stay readable.

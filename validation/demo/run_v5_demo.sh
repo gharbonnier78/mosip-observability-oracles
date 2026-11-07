@@ -95,6 +95,7 @@ for c in "${CASES[@]}"; do
 done
 echo; echo "================ stability ================"
 python3 validation/v5_stability.py "$OUT" && echo "  RUNS PAGE : $OAEF_REPORT_BASE_URL/index.html"
+python3 validation/v5_export.py "$OUT" && echo "  ZIP       : $OAEF_REPORT_BASE_URL/exports/ (offline campaign zip, xray cucumber.json)"
 echo; echo "================ summary ================"
 printf '%s\n' "${SUMMARY[@]}"
 if [ "$UNEXPECTED" -eq 0 ]; then echo "DEMO RESULT: every case behaved as expected"; else echo "DEMO RESULT: UNEXPECTED behaviour, see above"; exit 1; fi

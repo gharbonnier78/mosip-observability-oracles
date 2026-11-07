@@ -70,7 +70,15 @@ jobs:
           path: |
             ${{ github.workspace }}/oaef-v5/
             !${{ github.workspace }}/oaef-v5/runs
+            !${{ github.workspace }}/oaef-v5/exports
           retention-days: 14
+      - name: Upload the offline campaign zip and the Xray Cucumber JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaef-v5-campaign-zip
+          path: ${{ github.workspace }}/oaef-v5/exports/
+          retention-days: 30
       - name: Stop the stack
         if: always()
         run: docker compose -f validation/demo/docker-compose.yml down
