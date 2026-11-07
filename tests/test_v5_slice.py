@@ -38,7 +38,8 @@ class V5SyntheticSlice(unittest.TestCase):
                 ('wrong_value', 'EVENT-EFFECT-VALUE'),
                 ('slow', 'NFR-DEMO-LATENCY'),
                 ('metric_count', 'METRIC-COUNT'),
-                ('broken_link', 'SPAN-PARENT-idrepo-server')):
+                ('broken_link', 'SPAN-PARENT-idrepo-server'),
+                ('missing_metric', 'METRIC-SVC-COUNT-idgenerator')):
             with self.subTest(fault=fault):
                 _, p, v = self.run_case(100, fault, 17)
                 self.assertEqual(p.returncode, 1, p.stdout + p.stderr)

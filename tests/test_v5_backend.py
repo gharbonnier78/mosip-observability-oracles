@@ -62,6 +62,24 @@ class MemoryGrafana:
                                   'result': [{'stream': {'service_name': 'oaef-s1-simulator'},
                                               'values': rows[:limit]}]}}
         if path == '/api/datasources/proxy/uid/prometheus-demo/api/v1/query':
+            q = query.get('query', [''])[0]
+            if 'traces_service_graph' in q:   # Tempo-derived service graph: every expected edge present
+                contract = json.loads((ROOT / 'contracts/NIN-001-v5-slice.json').read_text())
+                return 200, {'status': 'success', 'data': {'resultType': 'vector', 'result': [
+                    {'metric': {'client': c, 'server': s}, 'value': [1800000000, '100']}
+                    for c, s in contract['service_graph_edges']]}}
+            if 'http_server_request_duration' in q:   # per-service request metrics of the run
+                rows = []
+                for g in self.posted['/v1/metrics']['resourceMetrics'][1:]:
+                    svc = next(a['value']['stringValue'] for a in g['resource']['attributes'] if a['key'] == 'service.name')
+                    for dp in g['scopeMetrics'][0]['metrics'][0]['histogram']['dataPoints']:
+                        lab = {a['key']: next(iter(a['value'].values())) for a in dp['attributes']}
+                        base = {'service_name': svc, 'http_route': lab['http.route'], 'oaef_run_id': lab['oaef.run.id']}
+                        rows.append({'metric': dict(base, __name__='http_server_request_duration_seconds_count'),
+                                     'value': [1800000000, str(dp['count'])]})
+                        rows.append({'metric': dict(base, __name__='http_server_request_duration_seconds_sum'),
+                                     'value': [1800000000, str(dp['sum'])]})
+                return 200, {'status': 'success', 'data': {'resultType': 'vector', 'result': rows}}
             if self.metric_missing:
                 return 200, {'status': 'success', 'data': {'resultType': 'vector', 'result': []}}
             met = self.posted['/v1/metrics']['resourceMetrics'][0]['scopeMetrics'][0]['metrics'][0]
@@ -203,6 +221,82 @@ class V5BackendTest(unittest.TestCase):
         self.assertEqual((run.returncode, proc.returncode), (1, 1), proc.stdout + proc.stderr)
         self.assertEqual(v['classification'], 'TRACE_CONTEXT_BROKEN')
         self.assertIn('SPAN-PARENT-idrepo-server', {x['check_id'] for x in v['event_span_failures']})
+
+    def allure_results(self, out):
+        res = out / 'allure-results'
+        results = [json.loads(p.read_text(encoding='utf-8')) for p in sorted(res.glob('*-result.json'))]
+        containers = [json.loads(p.read_text(encoding='utf-8')) for p in res.glob('*-container.json')]
+        for r in results:  # basic Allure 2 result schema
+            for key in ('uuid', 'historyId', 'fullName', 'name', 'status', 'stage', 'start', 'stop',
+                        'labels', 'links', 'steps', 'attachments'):
+                self.assertIn(key, r)
+            self.assertIn(r['status'], ('passed', 'failed', 'broken', 'skipped', 'unknown'))
+            self.assertLessEqual(r['start'], r['stop'])
+            for att in r['attachments']:
+                self.assertTrue((res / att['source']).is_file(), att['source'])
+            for s in r['steps']:
+                self.assertEqual({p['name'] for p in s['parameters']}, {'Expected', 'Observed'})
+        self.assertEqual(len(containers), 1)
+        self.assertEqual(set(containers[0]['children']), {r['uuid'] for r in results})
+        self.assertTrue((res / 'environment.properties').is_file())
+        return {r['fullName']: r for r in results}
+
+    def test_allure_results_nominal(self):
+        out, _, proc, _, _ = self.run_sample()
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        results = self.allure_results(out)
+        self.assertEqual(set(results), {'NIN-001.none.TX-001', 'NIN-001.none.run'})
+        tx = results['NIN-001.none.TX-001']
+        self.assertEqual(tx['status'], 'passed')
+        self.assertEqual([s['name'].split()[0] for s in tx['steps']],
+                         ['STEP-1', 'STEP-2', 'STEP-3', 'STEP-4', 'STEP-5'])
+        labels = {(l['name'], l['value']) for l in tx['labels']}
+        self.assertTrue({('suite', 'NIN-001'), ('fault', 'none'),
+                         ('diagnostic_class', 'S1_TELEMETRY_CONFORMANT')} <= labels)
+        self.assertIn(('run_id', json.loads((out / 'manifest.json').read_text())['run_id']), labels)
+        self.assertTrue(all('/explore?schemaVersion=1' in l['url'] for l in tx['links']))
+        self.assertEqual({a['type'] for a in tx['attachments']}, {'image/svg+xml', 'text/html'})
+        # allure-results is part of the sealed bundle
+        sealed = json.loads((out / 'evidence-sha256.json').read_text())['files']
+        self.assertTrue(any(k.startswith('allure-results/') for k in sealed))
+
+    def test_allure_results_duplicate(self):
+        out, _, proc, _, _ = self.run_sample(fault='duplicate')
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        results = self.allure_results(out)
+        self.assertEqual(set(results), {'NIN-001.duplicate.TX-002', 'NIN-001.duplicate.TX-001',
+                                        'NIN-001.duplicate.run'})
+        bad = results['NIN-001.duplicate.TX-002']
+        self.assertEqual(bad['status'], 'failed')
+        self.assertIn('[OBSERVABILITY_VIOLATION]', bad['statusDetails']['message'])
+        step3 = next(s for s in bad['steps'] if s['name'].startswith('STEP-3'))
+        self.assertEqual(step3['status'], 'failed')
+        self.assertIn('EVENT-EXACT-mosip.identity.uin.assigned',
+                      next(p['value'] for p in step3['parameters'] if p['name'] == 'Observed'))
+        self.assertEqual(results['NIN-001.duplicate.TX-001']['status'], 'passed')
+        self.assertEqual(results['NIN-001.duplicate.run']['status'], 'failed')
+
+    def test_allure_missing_event_is_broken(self):
+        out, _, proc, _, _ = self.run_sample(drop_event=True)
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+        results = self.allure_results(out)
+        self.assertEqual(results['NIN-001.none.TX-002']['status'], 'broken')
+        self.assertIn('[EVIDENCE_GAP]', results['NIN-001.none.TX-002']['statusDetails']['message'])
+
+    def test_service_without_metrics_is_detected(self):
+        out, run, proc, v, _ = self.run_sample(fault='missing_metric')
+        self.assertEqual(run.returncode, 1)                     # source side: the service emitted no metric
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)   # backend: absent series = evidence gap
+        bad = {m['check_id']: m['status'] for m in v['metric_checks'] if m['status'] != 'PASS'}
+        self.assertEqual(bad, {'METRIC-SVC-COUNT-idgenerator': 'INCONCLUSIVE', 'METRIC-SVC-SUM-idgenerator': 'INCONCLUSIVE'})
+        self.assertTrue(all(g['status'] == 'PASS' for g in v['derived_metrics_health']))
+
+    def test_service_metrics_reconciled_with_traces(self):
+        _, _, proc, v, _ = self.run_sample()
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        svc = [m for m in v['metric_checks'] if m['check_id'].startswith('METRIC-SVC-')]
+        self.assertEqual(len(svc), 8)                           # 4 services x (count, sum)
+        self.assertTrue(all(m['status'] == 'PASS' for m in svc))
 
     def test_latency_breach_is_fail_not_inconclusive(self):
         _, run, proc, v, _ = self.run_sample(fault='slow')

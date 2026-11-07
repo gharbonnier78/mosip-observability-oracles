@@ -17,4 +17,7 @@ services:
     volumes:
       # OAEF data sources: adds span -> metrics and log -> test report links to the image's defaults
       - ./grafana-datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml:ro
+      # OAEF dashboards (reusable): provider file + the JSON built by observability/dashboards/build_dashboards.py
+      - ./grafana-dashboards-oaef.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/oaef.yaml:ro
+      - ../../observability/dashboards:/otel-lgtm/oaef-dashboards:ro
     restart: unless-stopped

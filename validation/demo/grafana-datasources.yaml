@@ -43,6 +43,8 @@ datasources:
         queries:
           - name: "Journey duration of this run (exemplars on)"
             query: 'sum by (le) (oaef_synthetic_journey_duration_seconds_bucket{$$__tags})'
+          - name: "Request duration per service of this run (exemplars on)"
+            query: 'sum by (service_name, le) (http_server_request_duration_seconds_bucket{$$__tags})'
       serviceMap:
         datasourceUid: "prometheus"
       search:

@@ -5,10 +5,11 @@
 # so a mutant that escapes detection, or a nominal run that fails, makes this script fail.
 #
 # usage: bash validation/demo/run_v5_demo.sh [case ...]
-#   cases: tests s0 nominal duplicate missing slow broken_link wrong_value metric_count
+#   cases: tests s0 nominal duplicate missing slow broken_link wrong_value metric_count missing_metric
 #          (default: tests nominal duplicate missing slow broken_link)
 # env:   OAEF_OUT (default /tmp/oaef-v5)  OAEF_OTLP (http://localhost:4318)  OAEF_GRAFANA (http://localhost:3000)
 #        OAEF_SEED (20261107)  OAEF_COUNT (100)  OAEF_TARGET (17)
+#        OAEF_REPEAT (1): run each case N times; the stability page (index.html) tells STABLE from FLAKY
 #        OAEF_GRAFANA_PASSWORD or GF_ADMIN_PASSWORD (Codespaces secret; never committed)
 set -u
 cd "$(dirname "$0")/../.."
@@ -19,6 +20,7 @@ GRAFANA=${OAEF_GRAFANA:-http://localhost:3000}
 SEED=${OAEF_SEED:-20261107}
 COUNT=${OAEF_COUNT:-100}
 TARGET=${OAEF_TARGET:-17}
+REPEAT=${OAEF_REPEAT:-1}
 export OAEF_GRAFANA_PASSWORD=${OAEF_GRAFANA_PASSWORD:-${GF_ADMIN_PASSWORD:-}}
 TX=$(printf 'TX-%03d' "$TARGET")
 SUMMARY=()
@@ -48,18 +50,24 @@ print(f"  Prometheus: {{__name__=~\"oaef_synthetic_journey_duration.*\",oaef_run
 EOF
 }
 
-run_case() {  # run_case <case> <S1 exit> <collect exit>
-  local c=$1 s1=$2 col=$3 dir="$OUT/$1"
+run_case() {  # run_case <case> <S1 exit> <collect exit>; repeated OAEF_REPEAT times (folders <case>-r1, -r2, ...)
+  local i
+  if [ "$REPEAT" -le 1 ]; then run_one "$1" "$1" "$2" "$3"; return; fi
+  for i in $(seq 1 "$REPEAT"); do run_one "$1" "$1-r$i" "$2" "$3"; done
+}
+
+run_one() {  # run_one <case> <folder name> <S1 exit> <collect exit>
+  local case=$1 c=$2 s1=$3 col=$4 dir="$OUT/$2"
   echo; echo "================ $c ================"
   rm -rf "$dir"
   local fault=(--fault none)
-  [ "$c" != nominal ] && fault=(--fault "$c" --target "$TARGET")
+  [ "$case" != nominal ] && fault=(--fault "$case" --target "$TARGET")
   expect "$c: S1 generate + export + emitted-payload oracle" "$s1" \
     python3 validation/v5_demo.py run --count "$COUNT" --seed "$SEED" "${fault[@]}" --out "$dir" --otlp "$OTLP"
   [ -f "$dir/manifest.json" ] || { SUMMARY+=("UNEXPECTED  $c: no run produced"); UNEXPECTED=1; return; }
   show_ids "$dir"
   expect "$c: S2-read collect from Tempo/Loki/Prometheus" "$col" \
-    python3 validation/v5_backend.py collect --out "$dir" --grafana "$GRAFANA" --timeout 90 --poll 3
+    python3 validation/v5_backend.py collect --out "$dir" --grafana "$GRAFANA" --timeout 90 --poll 3 --otlp "$OTLP"
   expect "$c: evidence bundle integrity" 0 python3 validation/v5_backend.py verify-bundle --out "$dir"
   expect "$c: offline re-evaluation reproduces verdict" 0 python3 validation/v5_backend.py re-evaluate --out "$dir"
   mkdir -p "$OUT/runs" && ln -sfn "../$c" "$OUT/runs/$(python3 -c "import json;print(json.load(open('$dir/manifest.json'))['run_id'])")"
@@ -81,9 +89,12 @@ for c in "${CASES[@]}"; do
     broken_link)  run_case broken_link 1 1 ;;   # FAIL: SPAN-PARENT-idrepo-server (trace context lost)
     wrong_value)  run_case wrong_value 1 1 ;;   # FAIL: EVENT-EFFECT-VALUE
     metric_count) run_case metric_count 1 1 ;;  # FAIL: PROM-MEASUREMENTS-COUNT 101 vs 100
+    missing_metric) run_case missing_metric 1 2 ;;  # source FAIL; backend INCONCLUSIVE (idgenerator emits no metric)
     *) echo "unknown case: $c" >&2; exit 2 ;;
   esac
 done
+echo; echo "================ stability ================"
+python3 validation/v5_stability.py "$OUT" && echo "  RUNS PAGE : $OAEF_REPORT_BASE_URL/index.html"
 echo; echo "================ summary ================"
 printf '%s\n' "${SUMMARY[@]}"
 if [ "$UNEXPECTED" -eq 0 ]; then echo "DEMO RESULT: every case behaved as expected"; else echo "DEMO RESULT: UNEXPECTED behaviour, see above"; exit 1; fi

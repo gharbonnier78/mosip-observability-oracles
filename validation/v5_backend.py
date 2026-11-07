@@ -28,7 +28,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from v5_demo import KINDS, av, attrs, dump, load, verify
+from v5_allure import write_allure
+from v5_demo import KINDS, all_spans, av, attrs, dump, load, service_metric_checks, verify
 from v5_report import public_grafana_url, write_report
 
 HASH_FILE = 'evidence-sha256.json'
@@ -206,6 +207,91 @@ def classify(base_verdict, trace_count, expected_count, log_count, expected_logs
     return overall
 
 
+SVC_QUERY = '{{__name__=~"http_server_request_duration_seconds_(count|sum)",oaef_run_id="{run}"}}'
+GRAPH_QUERY = 'sum by (client, server) (increase(traces_service_graph_request_total[15m]))'
+
+
+def parse_service_metrics(doc, run_id):
+    """{(service_name, http_route): (count, sum)} from an instant query on the per-service request metric."""
+    if not isinstance(doc, dict) or doc.get('status') != 'success':
+        raise BackendProblem('Prometheus did not return a successful per-service query')
+    out = {}
+    for row in doc['data']['result']:
+        labels = row.get('metric', {})
+        if labels.get('oaef_run_id') != run_id:
+            raise BackendProblem('Prometheus returned a per-service metric from a foreign run')
+        key = (labels.get('service_name'), labels.get('http_route'))
+        count, total = out.get(key, (None, None))
+        value = float(row['value'][1])
+        if labels.get('__name__', '').endswith('_count'):
+            count = int(value)
+        else:
+            total = value
+        out[key] = (count, total)
+    return {k: v for k, v in out.items() if None not in v}
+
+
+def service_checks(svc_obs, contract, ledger, collected):
+    """Per-service metrics of the run reconciled with the ledger (count) and with Tempo (sum of server spans)."""
+    spans = all_spans(collected) if collected else []
+    out = []
+    for c in service_metric_checks(contract, ledger, spans, svc_obs):
+        if c['actual'] is None:
+            st = 'INCONCLUSIVE'
+        elif c['check_id'].startswith('METRIC-SVC-SUM-'):
+            st = 'PASS' if abs(c['actual'] - c['expected']) <= 1e-3 else 'FAIL'
+        else:
+            st = 'PASS' if c['actual'] == c['expected'] else 'FAIL'
+        out.append(dict(c, status=st))
+    return out
+
+
+def graph_checks(doc, contract):
+    """Health of Tempo's derived service graph: expected edges present. Not part of the verdict."""
+    edges = {}
+    if isinstance(doc, dict) and doc.get('status') == 'success':
+        for row in doc['data']['result']:
+            m = row.get('metric', {})
+            edges[(m.get('client'), m.get('server'))] = float(row['value'][1])
+    out = []
+    for client, server in contract.get('service_graph_edges', []):
+        n = edges.get((client, server))
+        out.append({'check_id': f'GRAPH-EDGE-{client}->{server}', 'expected': 'present',
+                    'actual': None if n is None else round(n, 1), 'status': 'PASS' if n else 'WARN'})
+    return out
+
+
+def publish_verdict(otlp_url, verdict, manifest, report_url):
+    """Publish the run verdict as an OTLP log event (oaef.test.verdict) for the OAEF dashboards.
+
+    Sent after sealing: a notification for humans, not part of the evidence. Failure to send is reported, not fatal.
+    """
+    if not otlp_url:
+        return
+    now = str(time.time_ns())
+    body = {'event_name': 'oaef.test.verdict', 'run_id': verdict['run_id'], 'test_case': 'NIN-001',
+            'fault': manifest.get('fault'), 'status': verdict['status'], 'classes': verdict.get('diagnostic_classes'),
+            'failed_checks': len(verdict['event_span_failures']) + sum(m['status'] != 'PASS' for m in verdict['metric_checks']),
+            'transactions': verdict['transaction_count'], 'report_url': report_url}
+    record = {'timeUnixNano': now, 'observedTimeUnixNano': now, 'severityNumber': 9 if verdict['status'] == 'PASS' else 17,
+              'severityText': 'INFO' if verdict['status'] == 'PASS' else 'ERROR', 'eventName': 'oaef.test.verdict',
+              'body': {'stringValue': json.dumps(body, sort_keys=True)},
+              'attributes': attrs({'oaef.run.id': verdict['run_id'], 'test.case.name': 'NIN-001',
+                                   'oaef.test.verdict': verdict['status'],
+                                   'oaef.diagnostic.class': (verdict.get('diagnostic_classes') or [''])[0],
+                                   'oaef.report.url': report_url})}
+    payload = {'resourceLogs': [{'resource': {'attributes': attrs({
+        'service.name': 'oaef-jarvis', 'service.namespace': 'oaef', 'deployment.environment.name': 'test-int'})},
+        'scopeLogs': [{'scope': {'name': 'oaef.v5.verdict'}, 'logRecords': [record]}]}]}
+    try:
+        req = Request(otlp_url.rstrip('/') + '/v1/logs', data=json.dumps(payload).encode(), method='POST',
+                      headers={'Content-Type': 'application/json'})
+        with urlopen(req, timeout=10) as res:
+            print('Verdict event published:', res.status)
+    except (URLError, TimeoutError, OSError) as ex:
+        print('Verdict event not published:', type(ex).__name__)
+
+
 def diagnostic_classes(status, failures, metric_checks):
     """Every applicable diagnostic class, most specific first; several defects can coexist."""
     if status == 'PASS':
@@ -308,7 +394,10 @@ def re_evaluate(out):
         base = load(tmp / 'collected-verdict.json')
     prom_file = out / 'backend-raw/prometheus.json'
     series = parse_prometheus(load(prom_file), manifest['run_id']) if prom_file.exists() else {}
-    metric_checks = observed_metric_checks(series, contract, ledger)
+    svc_file = out / 'backend-raw/prometheus-services.json'
+    svc_obs = parse_service_metrics(load(svc_file), manifest['run_id']) if svc_file.exists() else {}
+    metric_checks = (observed_metric_checks(series, contract, ledger)
+                     + service_checks(svc_obs, contract, ledger, load(out / 'collected-otel.json')))
     result = classify(base, meta['returned_trace_count'], len(ledger),
                       meta['parsed_log_records'], len(ledger) * len(contract['required_events']),
                       meta['backend_errors'], meta['parse_errors'],
@@ -321,7 +410,7 @@ def re_evaluate(out):
     return same
 
 
-def collect(out, grafana_url, timeout, poll, limit):
+def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
     if not (out / 'observed.json').exists() or not (out / 'ledger.json').exists():
         raise BackendProblem('Run directory missing S1 emitted/ledger artifacts')
     emitted = load(out / 'observed.json')
@@ -349,11 +438,16 @@ def collect(out, grafana_url, timeout, poll, limit):
     client = Grafana(grafana_url)
     uid = client.uids()
     trace_docs, errors, loki_doc, prom_doc = {}, {}, None, None
-    deadline = time.monotonic() + timeout
+    started = time.monotonic()
+    started_ns = time.time_ns()
+    deadline = started + timeout
     attempts = 0
+    attempt_log = []   # how the collector converged: one row per polling attempt
     while True:
         attempts += 1
         errors = {}
+        row = {'attempt': attempts, 't_s': round(time.monotonic() - started, 2)}
+        t0 = time.monotonic()
         # Fetch each exact trace ID; never query only a global last-hour window.
         def one(tid):
             return tid, client.proxy(uid['tempo'], '/api/traces/' + tid)
@@ -366,6 +460,9 @@ def collect(out, grafana_url, timeout, poll, limit):
                     trace_docs[tid] = doc
                 except BackendProblem as ex:
                     errors['tempo'] = str(ex)
+        row['tempo'] = {'requests': len(trace_ids), 'returned': sum(bool(d) for d in trace_docs.values()),
+                        'ms': round((time.monotonic() - t0) * 1000), 'error': errors.get('tempo')}
+        t0 = time.monotonic()
         try:
             # Run id is in the structured JSON log body, NOT a cardinality-heavy index label.
             loki_doc = client.proxy(uid['loki'], '/loki/api/v1/query_range', {
@@ -376,6 +473,9 @@ def collect(out, grafana_url, timeout, poll, limit):
         except BackendProblem as ex:
             errors['loki'] = str(ex)
             loki_doc, log_otlp, malformed, seen, log_count = None, None, ['loki_unavailable'], 0, 0
+        row['loki'] = {'lines': seen, 'parsed': log_count, 'ms': round((time.monotonic() - t0) * 1000),
+                       'error': errors.get('loki')}
+        t0 = time.monotonic()
         try:
             expression = '{__name__=~"' + METRIC_PREFIX + '.*",oaef_run_id="' + run_id + '"}'
             prom_doc = client.proxy(uid['prometheus'], '/api/v1/query', {
@@ -384,15 +484,40 @@ def collect(out, grafana_url, timeout, poll, limit):
         except BackendProblem as ex:
             errors['prometheus'] = str(ex)
             prom_doc, series = None, {}
+        try:
+            svc_doc = client.proxy(uid['prometheus'], '/api/v1/query', {
+                'query': SVC_QUERY.format(run=run_id), 'time': str(time.time())})
+            svc_obs = parse_service_metrics(svc_doc, run_id)
+        except BackendProblem as ex:
+            errors['prometheus-services'] = str(ex)
+            svc_doc, svc_obs = None, {}
+        row['prometheus'] = {'series': len(series), 'service_series': len(svc_obs),
+                             'ms': round((time.monotonic() - t0) * 1000),
+                             'error': errors.get('prometheus') or errors.get('prometheus-services')}
         trace_count = sum(bool(doc) for doc in trace_docs.values())
-        metric_checks = observed_metric_checks(series, contract, ledger)
+        metric_checks = (observed_metric_checks(series, contract, ledger)
+                         + service_checks(svc_obs, contract, ledger, {'traces': flatten_traces(trace_docs)}
+                                          if trace_count else None))
         ready = (not errors and trace_count == len(trace_ids) and
                  log_count >= len(ledger) * len(contract['required_events']) and
                  all(c['status'] != 'INCONCLUSIVE' for c in metric_checks))
+        row['complete'] = ready
+        attempt_log.append(row)
         if ready or time.monotonic() >= deadline:
             break
         time.sleep(min(poll, max(0, deadline - time.monotonic())))
 
+    graph_doc, graph = None, []
+    graph_deadline = time.monotonic() + min(45, max(timeout, 1))
+    while True:   # Tempo's metrics generator flushes periodically: give the derived graph a short settle
+        try:
+            graph_doc = client.proxy(uid['prometheus'], '/api/v1/query', {'query': GRAPH_QUERY, 'time': str(time.time())})
+        except BackendProblem:
+            graph_doc = None
+        graph = graph_checks(graph_doc, contract)
+        if all(g['status'] == 'PASS' for g in graph) or time.monotonic() >= graph_deadline:
+            break
+        time.sleep(min(poll * 2, max(0, graph_deadline - time.monotonic())))
     collected = {'traces': flatten_traces(trace_docs),
                  'logs': log_otlp or {'resourceLogs': [{'scopeLogs': [{'logRecords': []}]}]},
                  'metrics': {'resourceMetrics': []}}
@@ -400,6 +525,12 @@ def collect(out, grafana_url, timeout, poll, limit):
     meta = {'source': 'Grafana proxy Tempo/Loki/Prometheus API', 'queried_base': client.base,
             'uids': uid, 'query_start_ns': str(start_ns), 'query_end_ns': str(end_ns),
             'attempts': attempts, 'queried_trace_count': len(trace_ids),
+            'collection_log': attempt_log, 'collect_started_ns': str(started_ns),
+            'collect_seconds': round(time.monotonic() - started, 2), 'timeout_s': timeout, 'poll_s': poll,
+            'queries': {'tempo': 'GET /api/traces/{trace_id} for each emitted trace id',
+                        'loki': {'query': selector + ' |= "' + run_id + '"', 'start_ns': str(start_ns),
+                                 'end_ns': str(end_ns), 'limit': limit, 'direction': 'forward'},
+                        'prometheus': '{__name__=~"' + METRIC_PREFIX + '.*",oaef_run_id="' + run_id + '"} (instant)'},
             'returned_trace_count': trace_count, 'queried_log_records': seen,
             'parsed_log_records': log_count, 'loki_limit': limit,
             'loki_truncated_possible': seen >= limit, 'parse_errors': malformed,
@@ -415,6 +546,10 @@ def collect(out, grafana_url, timeout, poll, limit):
         dump(out / 'backend-raw/loki.json', loki_doc)
     if prom_doc is not None:
         dump(out / 'backend-raw/prometheus.json', prom_doc)
+    if svc_doc is not None:
+        dump(out / 'backend-raw/prometheus-services.json', svc_doc)
+    if graph_doc is not None:
+        dump(out / 'backend-raw/service-graph.json', graph_doc)
     verify(out, observed_name='collected-otel.json', verdict_name='collected-verdict.json',
            check_metrics=False, source='actually queried Grafana/Tempo/Loki records, synthetic S1')
     base = load(out / 'collected-verdict.json')
@@ -427,6 +562,7 @@ def collect(out, grafana_url, timeout, poll, limit):
                'events_expected': len(ledger) * len(contract['required_events']),
                'events_collected': log_count, 'event_span_failures': base['failures'],
                'metric_checks': metric_checks,
+               'derived_metrics_health': graph,
                'evidence_sufficiency': 'SUFFICIENT_FOR_S1' if status != 'INCONCLUSIVE' else 'INSUFFICIENT',
                'classification': diagnostic_classes(status, base['failures'], metric_checks)[0],
                'diagnostic_classes': diagnostic_classes(status, base['failures'], metric_checks),
@@ -444,12 +580,15 @@ def collect(out, grafana_url, timeout, poll, limit):
               'Manifest hashes are local integrity checks; not signatures or WORM.']
     (out / 'backend-report.md').write_text('\n'.join(report) + '\n', encoding='utf-8')
     write_report(out, public_grafana_url(grafana_url), uid)
+    write_allure(out, public_grafana_url(grafana_url), uid)
     seal(out)
-    print('Report:', out / 'report.html')
+    print('Report:', out / 'report.html', '| Allure results:', out / 'allure-results')
     print('BACKEND', status, '| traces', trace_count, '/', len(trace_ids),
           '| structured events', log_count, '/', verdict['events_expected'],
           '| metrics', Counter(x['status'] for x in metric_checks), '| attempts', attempts)
     print('Evidence:', out, '| local integrity:', verify_bundle(out))
+    publish_verdict(otlp_url, verdict, manifest,
+                    os.environ.get('OAEF_REPORT_BASE_URL', '').rstrip('/') + f'/runs/{run_id}/report.html')
     return status
 
 
@@ -462,6 +601,8 @@ def main(argv=None):
     c.add_argument('--timeout', type=float, default=45)
     c.add_argument('--poll', type=float, default=2)
     c.add_argument('--limit', type=int, default=2500)
+    c.add_argument('--otlp', default=os.environ.get('OAEF_OTLP'),
+                   help='OTLP/HTTP endpoint to publish the verdict event (dashboards); not part of the evidence')
     v = sub.add_parser('verify-bundle')
     v.add_argument('--out', type=Path, required=True)
     offline = sub.add_parser('re-evaluate')
@@ -476,7 +617,7 @@ def main(argv=None):
             return 0 if re_evaluate(a.out) else 1
         if a.timeout < 0 or a.poll <= 0 or a.limit < 10:
             raise BackendProblem('Invalid timeout/poll/limit')
-        status = collect(a.out, a.grafana, a.timeout, a.poll, a.limit)
+        status = collect(a.out, a.grafana, a.timeout, a.poll, a.limit, a.otlp)
         return {'PASS': 0, 'FAIL': 1, 'INCONCLUSIVE': 2}[status]
     except (BackendProblem, OSError, KeyError, ValueError) as ex:
         print('BACKEND ERROR:', str(ex), file=sys.stderr)

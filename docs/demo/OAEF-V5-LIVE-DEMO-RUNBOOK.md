@@ -25,6 +25,7 @@ Say this table out loud at the start and at the end. Every result label in the d
 - Grafana password from a **Codespaces secret** `GF_ADMIN_PASSWORD`, not the default `change-me`. The scripts read `OAEF_GRAFANA_PASSWORD` or `GF_ADMIN_PASSWORD`.
 - Ports 3000 (Grafana), 4318 (OTLP) and 8080 (reports) forwarded **Private**. Sign in to Grafana in the demo browser before the session.
 - The image is pinned by digest in `validation/demo/docker-compose.yml` (the one used in the recorded run).
+- For the Allure view across runs (optional): Node (`npx`) and Java 8+, both in the Codespace image (`node -v`, `java -version`). The Allure CLI is fetched by `npx` at a pinned version (`allure-commandline@2.39.0`); no secret, no extra port.
 
 ## 2. Preparation (day before, about 15 minutes)
 
@@ -33,7 +34,13 @@ bash validation/demo/start_stack.sh
 bash validation/demo/run_v5_demo.sh tests s0 nominal duplicate missing slow broken_link
 ```
 
-The last line must read `DEMO RESULT: every case behaved as expected`. Then:
+The last line must read `DEMO RESULT: every case behaved as expected`. Optionally build the Allure report over all these runs:
+
+```bash
+bash validation/demo/allure_report.sh
+```
+
+It prints the **ALLURE** URL (`$OAEF_REPORT_BASE_URL/allure-report/`, served by the same port 8080). Then:
 
 1. Open each printed `REPORT` URL once (Codespaces asks for GitHub sign-in on port 8080 the first time).
 2. Fill in the **Live run record** (section 7) with run IDs, counts and exit codes.
@@ -69,8 +76,15 @@ Roles: presenter speaks, demo driver types and clicks. Terminal font enlarged, n
 | Loki event line | `trace_id` field | Tempo trace |
 | Loki event line | `oaef_run_id` field → **OAEF test report** | the run's HTML report on port 8080 |
 | Prometheus exemplar | `trace_id` | Tempo trace |
+| Allure report (`/allure-report/`) | **Suites** → `NIN-001` → case (`none`, `duplicate`, …) → test | one examined transaction of one run (or the run verdict): scenario steps with Expected / Observed, labels `run_id`, `fault`, `diagnostic_class` |
+| Allure test | **Links** | Tempo trace · Loki events of that transaction · histogram with exemplars (same links as `report.html`) |
+| Allure test | attachments | the transaction's sequence diagram (SVG, not clickable) · the run's `report.html` |
+| Allure | **Categories** | tests grouped by diagnostic class; `EVIDENCE_GAP` results are *broken*, not *failed* |
+| Allure test | **Retries** | the same case and transaction in the other runs of `$OAEF_OUT` (repeated runs of a case share a history id, so the latest is shown and the others are its retries) |
 
-The links are versioned: `validation/demo/grafana-datasources.yaml` (Grafana provisioning, replaces the image's file) and `validation/v5_report.py` (report). For S2, the same provisioning has a commented template linking a log to the SUT's own UI by business key (e.g. MOSIP admin packet status by RID).
+The links are versioned: `validation/demo/grafana-datasources.yaml` (Grafana provisioning, replaces the image's file), `validation/v5_report.py` (report) and `validation/v5_allure.py` (Allure export).
+
+**Allure export.** `collect` also writes `allure-results/` into each run folder (Allure 2 results format: one `*-result.json` per examined transaction, i.e. every failed one plus the first passing one, one run-verdict result with the backend counts and metric checks, a `*-container.json` for the collection step, `environment.properties`, `categories.json`, attachments). It is part of the sealed bundle and is presentation only: it reads the verdict files and never recomputes them. Status mapping: transaction with failed checks → *failed* in a FAIL run, *broken* in an INCONCLUSIVE run; run verdict PASS/FAIL/INCONCLUSIVE → passed/failed/broken. To view without the report server: `npx --yes allure-commandline@2.39.0 serve /tmp/oaef-v5/*/allure-results` (opens a local web server on a random port). For S2, the same provisioning has a commented template linking a log to the SUT's own UI by business key (e.g. MOSIP admin packet status by RID).
 
 Expected exit codes (asserted by the script):
 
@@ -91,6 +105,7 @@ Expected exit codes (asserted by the script):
 | `collect` exit 3, `Grafana HTTP 401` | password not in the environment | `export OAEF_GRAFANA_PASSWORD=…` from the secret; rerun the case |
 | `collect` exit 2 on nominal, traces < 100 | ingestion still in progress | rerun only `collect` for the same folder (`python3 validation/v5_backend.py collect --out /tmp/oaef-v5/nominal --timeout 120`) |
 | Prometheus checks `INCONCLUSIVE` | label mapping differs, or the sample is older than 5 minutes | look at `backend-raw/prometheus.json`; do not edit the adapter live; say it and move on |
+| `allure_report.sh` fails: `java: not found` or `npx: not found` | Allure CLI needs Java 8+ and Node | skip it; `report.html` per run is the primary view |
 | REPORT URL does not open | report server not running, or port 8080 not signed in | `bash validation/demo/start_stack.sh`; open the Reports URL once and sign in |
 | Grafana link opens the login page | Grafana session expired | sign in, then click the link again |
 | Grafana unreachable | Codespace stopped or port closed | restart the Codespace (stack restarts by itself); otherwise switch to the fallback evidence, labelled "recorded" |
@@ -108,7 +123,7 @@ Expected exit codes (asserted by the script):
 - The metric series carries `oaef_run_id` as a label only for this short-lived demo; not a production practice. Exemplars are navigation aids (one per bucket), not evidence of completeness.
 - Report links point to the Codespace's forwarded URLs; they work while the Codespace runs and Tempo/Loki keep the data.
 - Tempo's JSON API returns trace and span IDs base64-encoded and kinds as enum names; the collector normalises both (covered by tests).
-- Pending from the V5 brief: verification-obligation manifest, Weaver registry, the full M01–M17 matrix, slides V5. An Allure-type report (Allure results + server) is a later option; `report.html` is the current single-run view.
+- Pending from the V5 brief: verification-obligation manifest, Weaver registry, the full M01–M17 matrix, slides V5. `report.html` is the single-run view; the Allure report (`allure_report.sh`) is the cross-run view built from the same verdicts. Allure's own trend graphs need its `history/` folder carried between `generate` calls; not set up here.
 
 ## 7. Live run records
 

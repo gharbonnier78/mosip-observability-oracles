@@ -1,0 +1,76 @@
+name: OAEF V5 live demo (LGTM stack on the runner)
+
+# Runs the full V5 demonstrator against a real Grafana LGTM stack started on the runner:
+# S0 smoke, then each case (S1 synthetic journey -> OTLP -> Tempo/Loki/Prometheus -> oracle -> sealed bundle),
+# and publishes the HTML reports, the stability page and the evidence bundles as an artifact.
+# Grafana links inside the reports point to the runner's localhost and die with the job; the reports'
+# static diagrams (sequence, span tree with timings, service graph, histogram) remain readable.
+on:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: 'Cases to run'
+        default: 'tests s0 nominal duplicate missing slow broken_link missing_metric'
+      repeat:
+        description: 'Repetitions per case (stability / flaky detection)'
+        default: '1'
+  push:
+    branches: [docs/oaef-v5-model-to-evidence-demo]
+    paths:
+      - 'validation/v5_*.py'
+      - 'validation/demo/**'
+      - 'contracts/**'
+      - 'observability/dashboards/**'
+      - '.github/workflows/oaef-v5-live.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GF_ADMIN_PASSWORD: ci-only-localhost   # ephemeral runner, Grafana bound to 127.0.0.1; not a secret
+      OAEF_OUT: ${{ github.workspace }}/oaef-v5
+      OAEF_REPEAT: ${{ github.event.inputs.repeat || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Start the LGTM stack and the report server
+        run: |
+          bash validation/demo/start_stack.sh
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://localhost:3000/api/health && break; sleep 2; done
+          curl -s http://localhost:3000/api/health
+          sleep 20   # Tempo, Loki and Prometheus inside the container start after Grafana
+      - name: Run the demo cases
+        shell: bash   # -eo pipefail: a failing case fails the job despite the tee
+        run: |
+          bash validation/demo/run_v5_demo.sh ${{ github.event.inputs.cases || 'tests s0 nominal duplicate missing slow broken_link missing_metric' }} | tee "$OAEF_OUT/demo.log"
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## OAEF V5 live demo"
+            echo
+            echo '```'
+            sed -n '/=== stability ===/,$p' "$OAEF_OUT/demo.log" 2>/dev/null || true
+            echo '```'
+            echo
+            echo "Download the **oaef-v5-reports** artifact and open \`index.html\` (runs and stability) or \`<case>/report.html\`."
+            echo "Grafana links in the reports point to this runner and no longer resolve after the job."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload reports and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oaef-v5-reports
+          path: |
+            ${{ github.workspace }}/oaef-v5/
+            !${{ github.workspace }}/oaef-v5/runs
+          retention-days: 14
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f validation/demo/docker-compose.yml down

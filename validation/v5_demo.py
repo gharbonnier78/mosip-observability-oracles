@@ -71,6 +71,43 @@ def span_detail(sid, name, kind):
     return {}
 
 
+def histogram_point(calls, start_ns, time_ns, attributes):
+    """Cumulative OTLP histogram point of the given calls, with the slowest call of each bucket as exemplar."""
+    durs = [c[0] for c in calls]
+    cum = [sum(1 for d in durs if d <= b) for b in BOUNDS]
+    buckets = [str(n - p) for n, p in zip(cum, [0] + cum[:-1])] + [str(len(durs) - cum[-1])]
+    exemplars, seen = [], set()
+    for d, trace_id, span_id, t, tx_id, *_ in sorted(calls, reverse=True):
+        b = next((i for i, x in enumerate(BOUNDS) if d <= x), len(BOUNDS))
+        if b not in seen:
+            seen.add(b)
+            exemplars.append({'timeUnixNano': str(t), 'asDouble': d, 'traceId': trace_id, 'spanId': span_id,
+                              'filteredAttributes': attrs({'oaef.transaction.id': tx_id})})
+    return {'attributes': attrs(attributes), 'startTimeUnixNano': str(start_ns), 'timeUnixNano': str(time_ns),
+            'count': str(len(durs)), 'sum': round(sum(durs), 6), 'explicitBounds': BOUNDS,
+            'bucketCounts': buckets, 'exemplars': exemplars}
+
+
+def service_metric_checks(contract, ledger, spans, observed):
+    """Per-service request metrics of the run: count = transactions, sum = durations of the server spans.
+
+    observed: {(service, route): (count, sum)}; a missing entry gives INCONCLUSIVE at the caller's choice.
+    """
+    out = []
+    for m in contract.get('service_metrics', []):
+        key = (m['service'], m['route'])
+        server = [s for s in spans if s.get('_svc') == m['service'] and span_kind(s) == 2
+                  and s['name'] == f'{m["method"]} {m["route"]}']
+        span_sum = round(sum(int(s['endTimeUnixNano']) - int(s['startTimeUnixNano']) for s in server) / 1e9, 6)
+        got = observed.get(key)
+        tag = m['service']
+        out.append({'check_id': f'METRIC-SVC-COUNT-{tag}', 'expected': len(ledger) * m['per_transaction'],
+                    'actual': None if got is None else got[0]})
+        out.append({'check_id': f'METRIC-SVC-SUM-{tag}', 'expected': span_sum,
+                    'actual': None if got is None else round(got[1], 6)})
+    return out
+
+
 def kv(k, v):
     typ = 'boolValue' if isinstance(v, bool) else 'intValue' if isinstance(v, int) else 'stringValue'
     return {'key': k, 'value': {typ: str(v) if typ == 'intValue' else v}}
@@ -129,6 +166,7 @@ def deterministic_id(seed, run, tx, stage, width):
 
 
 def emit(endpoint, otlp):
+    sent = []
     for name, suffix in [('traces', '/v1/traces'), ('logs', '/v1/logs'), ('metrics', '/v1/metrics')]:
         headers = {'Content-Type': 'application/json'}
         for item in os.environ.get('OTEL_EXPORTER_OTLP_HEADERS', '').split(','):
@@ -143,6 +181,9 @@ def emit(endpoint, otlp):
             if res.status not in (200, 202):
                 raise RuntimeError(f'{name} OTLP HTTP {res.status}')
             print('OTLP', name, res.status)
+            sent.append({'signal': name, 'url': endpoint.rstrip('/') + suffix, 'http_status': res.status,
+                         'bytes': len(request.data)})
+    return sent
 
 
 def generate(count, seed, fault, target, out, otlp_url):
@@ -153,10 +194,12 @@ def generate(count, seed, fault, target, out, otlp_url):
     run_id = 's1-' + (uuid.uuid4().hex[:12] if otlp_url else deterministic_id(seed, count, 'run', 'id', 12))
     # Live export must use recent timestamps so traces/logs are discoverable in Grafana.
     # Offline runs stay byte-for-byte deterministic for a fixed seed and count.
-    base = time.time_ns() - 30_000_000_000 if otlp_url else 1_800_000_000_000_000_000
-    tx_spacing = 200_000_000 if otlp_url else 5_000_000_000
+    # Live: every span ends 2-8 s before export, inside the window Tempo's metrics generator accepts (30 s).
+    base = time.time_ns() - 8_000_000_000 if otlp_url else 1_800_000_000_000_000_000
+    tx_spacing = 50_000_000 if otlp_url else 5_000_000_000
     spans_by_svc, logs, ledger = {}, [], []
     durations, roots = [], []
+    server_calls = {}   # service -> [(duration s, trace id, span id, start ns, tx id, method, route)]
     for tx in range(1, count + 1):
         tx_id = f'TX-{tx:03d}'
         trace_id = deterministic_id(seed, run_id, tx_id, 'trace', 32)
@@ -190,6 +233,10 @@ def generate(count, seed, fault, target, out, otlp_url):
             spans_by_svc.setdefault(svc, []).append(span)
             if sid == 'root':
                 roots.append((duration_ms / 1000, trace_id, ids[sid], started, tx_id))
+            if kind == 2:
+                method, route = name.split(' ', 1)
+                server_calls.setdefault(svc, []).append(((t1 - t0) / 1000, trace_id, ids[sid],
+                                                          started + t0 * 1_000_000, tx_id, method, route))
             if name in EVENTS:
                 t = str(started + t0 * 1_000_000)
                 logs.append({'_svc': svc, 'timeUnixNano': t, 'observedTimeUnixNano': t,
@@ -254,6 +301,18 @@ def generate(count, seed, fault, target, out, otlp_url):
                   'timeUnixNano': str(base + (count + 1) * tx_spacing),
                   'count': str(actual_count), 'sum': sum(durations) + (0.12 if fault == 'metric_count' else 0),
                   'explicitBounds': BOUNDS, 'bucketCounts': bucket_counts, 'exemplars': exemplars}]}}
+    service_metrics = []
+    for svc, calls in sorted(server_calls.items()):
+        if fault == 'missing_metric' and svc == 'idgenerator':
+            continue   # the service is not instrumented for metrics: traces exist, the metric does not
+        for method, route in sorted({(c[5], c[6]) for c in calls}):
+            rows = [c for c in calls if (c[5], c[6]) == (method, route)]
+            service_metrics.append({'resource': resource(svc), 'scopeMetrics': [{'scope': {'name': 'oaef.v5.s1'},
+                'metrics': [{'name': 'http.server.request.duration', 'unit': 's', 'histogram': {
+                    'aggregationTemporality': 2, 'dataPoints': [histogram_point(
+                        rows, base, base + (count + 1) * tx_spacing,
+                        {'http.request.method': method, 'http.route': route, 'http.response.status_code': 200,
+                         'oaef.run.id': run_id})]}}]}]})
     logs_by_svc = {}
     for r in logs:
         logs_by_svc.setdefault(r.pop('_svc'), []).append(r)
@@ -266,7 +325,8 @@ def generate(count, seed, fault, target, out, otlp_url):
             'metrics': {'resourceMetrics': [{'resource': {'attributes': attrs({
                             'service.name': 'oaef-s1-simulator', 'service.namespace': 'oaef',
                             'deployment.environment.name': 'test-int', 'oaef.simulation.mode': 'S1'})},
-                                            'scopeMetrics': [{'scope': {'name': 'oaef.v5.s1'}, 'metrics': [metric]}]}]}}
+                                            'scopeMetrics': [{'scope': {'name': 'oaef.v5.s1'}, 'metrics': [metric]}]}]
+                                            + service_metrics}}
     dump(out / 'contract.json', contract)
     dump(out / 'ledger.json', ledger)
     dump(out / 'observed.json', otlp)
@@ -277,7 +337,10 @@ def generate(count, seed, fault, target, out, otlp_url):
                                   'otlp_status': 'not_requested' if not otlp_url else 'attempted'})
     print('run id:', run_id, '| example trace id:', roots[0][1])
     if otlp_url:
-        emit(otlp_url, otlp)  # offline verdict below does not prove remote ingestion
+        sent = emit(otlp_url, otlp)  # offline verdict below does not prove remote ingestion
+        manifest = load(out / 'manifest.json')
+        manifest.update({'emitted_at_ns': str(time.time_ns()), 'emitted': sent})
+        dump(out / 'manifest.json', manifest)
     return verify(out)
 
 
@@ -288,9 +351,17 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
     manifest = load(out / 'manifest.json')
     expected_spans = contract['journey_spans']
     checks = []
+    evaluated = Counter()
+
+    def family(code):
+        for prefix in ('SPAN-PRESENT', 'SPAN-PARENT', 'EVENT-EXACT'):
+            if code.startswith(prefix):
+                return prefix
+        return code
 
     def check(code, actual, expected, tx=None, ref=None):
         ok = actual == expected
+        evaluated[family(code)] += 1
         if not ok:
             checks.append({'check_id': code, 'transaction_id': tx, 'expected': expected,
                            'actual': actual, 'status': 'FAIL', **({'ref': ref} if ref else {})})
@@ -344,6 +415,7 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
         if len(starts) == len(contract['required_events']):
             check('EVENT-PARTIAL-ORDER', [starts[x] for x in contract['required_events']] ==
                   sorted(starts.values()), True, tx)
+        evaluated['NFR-DEMO-LATENCY'] += 1
         if entry['upload_to_assignment_ms'] > contract['max_upload_to_assignment_ms']:
             check('NFR-DEMO-LATENCY', {'upload_to_assignment_ms': entry['upload_to_assignment_ms']},
                   {'max_upload_to_assignment_ms': contract['max_upload_to_assignment_ms']}, tx)
@@ -358,6 +430,14 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
         check('METRIC-BUCKET-TOTAL', sum(map(int, point['bucketCounts'])), len(ledger))
         check('METRIC-SUM', round(point['sum'], 6),
               round(sum(x['upload_to_assignment_ms'] / 1000 for x in ledger), 6))
+        emitted = {}
+        for group in otlp['metrics']['resourceMetrics'][1:]:
+            svc = av(group['resource']['attributes']).get('service.name')
+            for mt in group['scopeMetrics'][0]['metrics']:
+                for dp in mt['histogram']['dataPoints']:
+                    emitted[(svc, av(dp['attributes']).get('http.route'))] = (int(dp['count']), dp['sum'])
+        for mc in service_metric_checks(contract, ledger, spans, emitted):
+            check(mc['check_id'], mc['actual'], mc['expected'], None, mc['check_id'].split('-', 3)[-1])
     status = 'FAIL' if checks else 'PASS'
     verdict = {'run_id': manifest['run_id'], 'mode': 'S1', 'source': source or 'stored synthetic emitted payload only',
                'backend_ingestion_verified': False,
@@ -366,7 +446,11 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
                'count_expected_events': len(ledger) * len(contract['required_events']),
                'count_observed_spans': len(spans),
                'count_expected_spans': len(ledger) * len(expected_spans),
-               'status': status, 'failures': checks}
+               'status': status, 'failures': checks,
+               'evaluated': {f: {'evaluated': n, 'failed': sum(1 for c in checks if family(c['check_id']) == f)}
+                             for f, n in sorted(evaluated.items())},
+               'margins': {'max_upload_to_assignment_ms': max((x['upload_to_assignment_ms'] for x in ledger), default=0),
+                           'threshold_ms': contract['max_upload_to_assignment_ms']}}
     dump(out / verdict_name, verdict)
     print(f"{status}: {len(ledger)} tx; expected events {verdict['count_expected_events']}; "
           f"observed {len(records)}; spans {len(spans)}/{verdict['count_expected_spans']}; failed checks {len(checks)}")
@@ -381,7 +465,8 @@ def main(argv=None):
     run = sub.add_parser('run')
     run.add_argument('--count', type=int, default=100)
     run.add_argument('--seed', type=int, default=20261105)
-    run.add_argument('--fault', choices=['none', 'duplicate', 'missing', 'wrong_value', 'slow', 'metric_count', 'broken_link'], default='none')
+    run.add_argument('--fault', choices=['none', 'duplicate', 'missing', 'wrong_value', 'slow', 'metric_count', 'broken_link',
+                                           'missing_metric'], default='none')
     run.add_argument('--target', type=int, default=1)
     run.add_argument('--out', type=Path, required=True)
     run.add_argument('--otlp', help='Optional OTLP/HTTP collector base URL')
