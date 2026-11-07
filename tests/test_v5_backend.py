@@ -19,11 +19,12 @@ BACKEND = ROOT / 'validation/v5_backend.py'
 
 
 class MemoryGrafana:
-    def __init__(self, posted, drop_event=False, metric_missing=False, tempo_base64=False):
+    def __init__(self, posted, drop_event=False, metric_missing=False, tempo_base64=False, foreign_span=False):
         self.posted = posted
         self.drop_event = drop_event
         self.metric_missing = metric_missing
         self.tempo_base64 = tempo_base64
+        self.foreign_span = foreign_span
         self.paths = []
 
     def query(self, path, query):
@@ -43,6 +44,9 @@ class MemoryGrafana:
                     spans = [dict(s, kind=kinds[s['kind']],
                                   **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)})
                              for s in spans]
+                if self.foreign_span and spans and any(a['value'].get('stringValue') == 'TX-002'
+                                                       for a in spans[0]['attributes']):
+                    spans = [dict(spans[0], traceId='f' * 32)] + spans[1:]   # inconsistent Tempo reply
                 if spans:
                     groups.append({'resource': src['resource'], 'scopeSpans': [{'spans': spans}]})
             return (200, {'batches': groups}) if groups else (404, {})
@@ -102,7 +106,8 @@ class MemoryGrafana:
 
 
 class V5BackendTest(unittest.TestCase):
-    def run_sample(self, fault='none', drop_event=False, metric_missing=False, count=3, tempo_base64=False):
+    def run_sample(self, fault='none', drop_event=False, metric_missing=False, count=3, tempo_base64=False,
+                   foreign_span=False):
         work = tempfile.TemporaryDirectory()
         self.addCleanup(work.cleanup)
         root = Path(work.name)
@@ -141,7 +146,7 @@ class V5BackendTest(unittest.TestCase):
         run = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         self.assertEqual(set(posted), {'/v1/traces', '/v1/logs', '/v1/metrics'})
         backend = MemoryGrafana(posted, drop_event=drop_event, metric_missing=metric_missing,
-                                tempo_base64=tempo_base64)
+                                tempo_base64=tempo_base64, foreign_span=foreign_span)
         result = subprocess.run([sys.executable, str(BACKEND), 'collect', '--out', str(out),
                                  '--grafana', url, '--timeout', '0', '--poll', '0.01'],
                                 capture_output=True, text=True, timeout=30)
@@ -297,6 +302,16 @@ class V5BackendTest(unittest.TestCase):
         svc = [m for m in v['metric_checks'] if m['check_id'].startswith('METRIC-SVC-')]
         self.assertEqual(len(svc), 8)                           # 4 services x (count, sum)
         self.assertTrue(all(m['status'] == 'PASS' for m in svc))
+
+    def test_inconsistent_tempo_reply_is_evidence_gap_not_crash(self):
+        out, run, proc, v, _ = self.run_sample(foreign_span=True)
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)   # INCONCLUSIVE, not exit 3
+        self.assertEqual(v['classification'], 'EVIDENCE_GAP')
+        meta = json.loads((out / 'backend-meta.json').read_text())
+        self.assertIn('tempo-consistency', meta['backend_errors'])
+        self.assertIn('f' * 32, meta['backend_errors']['tempo-consistency'][0])
+        ok = subprocess.run([sys.executable, str(BACKEND), 'verify-bundle', '--out', str(out)], capture_output=True, text=True)
+        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
 
     def test_latency_breach_is_fail_not_inconclusive(self):
         _, run, proc, v, _ = self.run_sample(fault='slow')

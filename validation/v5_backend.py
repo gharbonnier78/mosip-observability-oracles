@@ -103,7 +103,9 @@ def hex_id(value, width):
     return raw.hex() if len(raw) * 2 == width else value
 
 
-def flatten_traces(trace_docs):
+def flatten_traces(trace_docs, problems=None):
+    """Normalise Tempo replies to OTLP spans. With `problems`, inconsistent spans are recorded and skipped
+    (the run becomes an evidence gap) instead of aborting the collection."""
     groups_out = []
     for trace_id, doc in trace_docs.items():
         if not doc:
@@ -122,7 +124,12 @@ def flatten_traces(trace_docs):
                     if span.get('parentSpanId'):
                         span['parentSpanId'] = hex_id(span['parentSpanId'], 16)
                     if span['traceId'] != trace_id.lower():
-                        raise BackendProblem('Tempo trace result contained another trace ID')
+                        msg = (f'Tempo reply for trace {trace_id} contained span {span["spanId"]} with trace id '
+                               f'{span.get("traceId")!r}')
+                        if problems is None:
+                            raise BackendProblem(msg)
+                        problems.append(msg)
+                        continue
                     spans.append(span)
             groups_out.append({'resource': group.get('resource', {}), 'scopeSpans': [{'spans': spans}]})
     return {'resourceSpans': groups_out}
@@ -184,6 +191,11 @@ def parse_prometheus(doc, run_id):
 def classify(base_verdict, trace_count, expected_count, log_count, expected_logs,
              backend_errors, bad_logs, truncated, metrics_checks):
     failures = base_verdict['failures']
+    if 'tempo-consistency' in (backend_errors or {}):
+        # Tempo returned inconsistent traces: checks built on those traces cannot prove a defect.
+        trace_based = ('SPAN-', 'RUN-SPAN', 'RUN-UNKNOWN-SPAN', 'EVENT-TRACE-CORRELATION', 'METRIC-SVC-SUM-')
+        failures = [f for f in failures if not f['check_id'].startswith(trace_based)]
+        metrics_checks = [m for m in metrics_checks if not m['check_id'].startswith(trace_based)]
     hard_fail = bool(bad_logs) or any(
         # NFR-DEMO-LATENCY is a proven violation of a declared threshold, not an evidence gap.
         f['check_id'] in ('EVENT-EFFECT-VALUE', 'EVENT-TRACE-CORRELATION', 'EVENT-PARTIAL-ORDER',
@@ -495,9 +507,13 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
                              'ms': round((time.monotonic() - t0) * 1000),
                              'error': errors.get('prometheus') or errors.get('prometheus-services')}
         trace_count = sum(bool(doc) for doc in trace_docs.values())
+        tempo_problems = []
         metric_checks = (observed_metric_checks(series, contract, ledger)
-                         + service_checks(svc_obs, contract, ledger, {'traces': flatten_traces(trace_docs)}
+                         + service_checks(svc_obs, contract, ledger, {'traces': flatten_traces(trace_docs, tempo_problems)}
                                           if trace_count else None))
+        if tempo_problems:
+            errors['tempo-consistency'] = tempo_problems[:5]
+        row['tempo']['inconsistent_spans'] = len(tempo_problems)
         ready = (not errors and trace_count == len(trace_ids) and
                  log_count >= len(ledger) * len(contract['required_events']) and
                  all(c['status'] != 'INCONCLUSIVE' for c in metric_checks))
@@ -518,7 +534,11 @@ def collect(out, grafana_url, timeout, poll, limit, otlp_url=None):
         if all(g['status'] == 'PASS' for g in graph) or time.monotonic() >= graph_deadline:
             break
         time.sleep(min(poll * 2, max(0, graph_deadline - time.monotonic())))
-    collected = {'traces': flatten_traces(trace_docs),
+    tempo_problems = []
+    flat = flatten_traces(trace_docs, tempo_problems)
+    if tempo_problems:   # inconsistent Tempo replies: keep the raw replies, conclude on the evidence, never abort
+        errors['tempo-consistency'] = tempo_problems[:5] + ([f'... {len(tempo_problems) - 5} more'] if len(tempo_problems) > 5 else [])
+    collected = {'traces': flat,
                  'logs': log_otlp or {'resourceLogs': [{'scopeLogs': [{'logRecords': []}]}]},
                  'metrics': {'resourceMetrics': []}}
     dump(out / 'collected-otel.json', collected)
