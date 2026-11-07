@@ -1,0 +1,11 @@
+{
+  "backend_ingestion_verified": false,
+  "count_expected_events": 300,
+  "count_expected_transactions": 100,
+  "count_observed_events": 300,
+  "failures": [],
+  "mode": "S1",
+  "run_id": "s1-c7d324d7093e",
+  "source": "stored synthetic emitted payload only",
+  "status": "PASS"
+}
