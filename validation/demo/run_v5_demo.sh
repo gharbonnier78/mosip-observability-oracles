@@ -5,13 +5,15 @@
 # so a mutant that escapes detection, or a nominal run that fails, makes this script fail.
 #
 # usage: bash validation/demo/run_v5_demo.sh [case ...]
-#   cases: tests s0 nominal duplicate missing slow wrong_value metric_count   (default: tests nominal duplicate missing slow)
+#   cases: tests s0 nominal duplicate missing slow broken_link wrong_value metric_count
+#          (default: tests nominal duplicate missing slow broken_link)
 # env:   OAEF_OUT (default /tmp/oaef-v5)  OAEF_OTLP (http://localhost:4318)  OAEF_GRAFANA (http://localhost:3000)
 #        OAEF_SEED (20261107)  OAEF_COUNT (100)  OAEF_TARGET (17)
 #        OAEF_GRAFANA_PASSWORD or GF_ADMIN_PASSWORD (Codespaces secret; never committed)
 set -u
 cd "$(dirname "$0")/../.."
-OUT=${OAEF_OUT:-/tmp/oaef-v5}
+. validation/demo/env.sh   # OAEF_OUT, OAEF_GRAFANA_PUBLIC_URL, OAEF_REPORT_BASE_URL
+OUT=$OAEF_OUT
 OTLP=${OAEF_OTLP:-http://localhost:4318}
 GRAFANA=${OAEF_GRAFANA:-http://localhost:3000}
 SEED=${OAEF_SEED:-20261107}
@@ -34,14 +36,14 @@ show_ids() {  # print the run id, the target transaction's trace id and ready-to
 import json, sys
 out, tx = sys.argv[1], sys.argv[2]
 m = json.load(open(out + '/manifest.json'))
-spans = json.load(open(out + '/observed.json'))['traces']['resourceSpans'][0]['scopeSpans'][0]['spans']
+spans = [s for g in json.load(open(out + '/observed.json'))['traces']['resourceSpans'] for s in g['scopeSpans'][0]['spans']]
 tid = next(s['traceId'] for s in spans
            if any(a['key'] == 'oaef.transaction.id' and a['value'].get('stringValue') == tx for a in s['attributes']))
 run = m['run_id']
 print(f"  run_id    : {run}   (fault: {m['fault']}, transactions: {m['transactions']})")
 print(f"  {tx} trace: {tid}")
 print(f"  Tempo     : trace id {tid}")
-print(f"  Loki      : {{service_name=\"oaef-s1-simulator\"}} |= \"{run}\" | json | transaction_id=\"{tx}\"")
+print(f"  Loki      : {{service_name=~\"idrepo-identity|regproc-pkr\"}} |= \"{run}\" | json | transaction_id=\"{tx}\"")
 print(f"  Prometheus: {{__name__=~\"oaef_synthetic_journey_duration.*\",oaef_run_id=\"{run}\"}}")
 EOF
 }
@@ -60,10 +62,12 @@ run_case() {  # run_case <case> <S1 exit> <collect exit>
     python3 validation/v5_backend.py collect --out "$dir" --grafana "$GRAFANA" --timeout 90 --poll 3
   expect "$c: evidence bundle integrity" 0 python3 validation/v5_backend.py verify-bundle --out "$dir"
   expect "$c: offline re-evaluation reproduces verdict" 0 python3 validation/v5_backend.py re-evaluate --out "$dir"
-  echo "  evidence  : $dir  (backend-verdict.json, backend-report.md, evidence-sha256.json)"
+  mkdir -p "$OUT/runs" && ln -sfn "../$c" "$OUT/runs/$(python3 -c "import json;print(json.load(open('$dir/manifest.json'))['run_id'])")"
+  echo "  evidence  : $dir"
+  echo "  REPORT    : $OAEF_REPORT_BASE_URL/$c/report.html"
 }
 
-CASES=("$@"); [ ${#CASES[@]} -eq 0 ] && CASES=(tests nominal duplicate missing slow)
+CASES=("$@"); [ ${#CASES[@]} -eq 0 ] && CASES=(tests nominal duplicate missing slow broken_link)
 [ -n "$OAEF_GRAFANA_PASSWORD" ] || echo "WARNING: OAEF_GRAFANA_PASSWORD / GF_ADMIN_PASSWORD not set; Grafana queries will fail." >&2
 for c in "${CASES[@]}"; do
   case "$c" in
@@ -74,6 +78,7 @@ for c in "${CASES[@]}"; do
     duplicate)    run_case duplicate 1 1 ;;     # FAIL: EVENT-EXACT-mosip.identity.uin.assigned, TX = 2 vs 1
     missing)      run_case missing 1 2 ;;       # INCONCLUSIVE / EVIDENCE_GAP, never PRODUCT_BUG
     slow)         run_case slow 1 1 ;;          # FAIL: NFR-DEMO-LATENCY (demo-only 2 s threshold)
+    broken_link)  run_case broken_link 1 1 ;;   # FAIL: SPAN-PARENT-idrepo-server (trace context lost)
     wrong_value)  run_case wrong_value 1 1 ;;   # FAIL: EVENT-EFFECT-VALUE
     metric_count) run_case metric_count 1 1 ;;  # FAIL: PROM-MEASUREMENTS-COUNT 101 vs 100
     *) echo "unknown case: $c" >&2; exit 2 ;;

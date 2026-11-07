@@ -33,23 +33,28 @@ class MemoryGrafana:
         prefix = '/api/datasources/proxy/uid/tempo-demo/api/traces/'
         if path.startswith(prefix):
             wanted = path.removeprefix(prefix)
-            src = self.posted['/v1/traces']['resourceSpans'][0]
-            spans = [s for s in src['scopeSpans'][0]['spans'] if s['traceId'] == wanted]
-            if self.tempo_base64:  # real Tempo JSON encodes OTLP bytes fields as base64
-                b64 = lambda h: base64.b64encode(bytes.fromhex(h)).decode()
-                spans = [dict(s, **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)})
-                         for s in spans]
-            return (200, {'resourceSpans': [{'resource': src['resource'],
-                         'scopeSpans': [{'spans': spans}]}]}) if spans else (404, {})
+            groups = []
+            for src in self.posted['/v1/traces']['resourceSpans']:
+                spans = [s for s in src['scopeSpans'][0]['spans'] if s['traceId'] == wanted]
+                if self.tempo_base64:  # real Tempo JSON: base64 bytes fields, enum names for kind
+                    b64 = lambda h: base64.b64encode(bytes.fromhex(h)).decode()
+                    kinds = ['SPAN_KIND_UNSPECIFIED', 'SPAN_KIND_INTERNAL', 'SPAN_KIND_SERVER',
+                             'SPAN_KIND_CLIENT', 'SPAN_KIND_PRODUCER', 'SPAN_KIND_CONSUMER']
+                    spans = [dict(s, kind=kinds[s['kind']],
+                                  **{k: b64(s[k]) for k in ('traceId', 'spanId', 'parentSpanId') if s.get(k)})
+                             for s in spans]
+                if spans:
+                    groups.append({'resource': src['resource'], 'scopeSpans': [{'spans': spans}]})
+            return (200, {'batches': groups}) if groups else (404, {})
         if path == '/api/datasources/proxy/uid/loki-demo/loki/api/v1/query_range':
-            logs = self.posted['/v1/logs']['resourceLogs'][0]['scopeLogs'][0]['logRecords']
+            logs = [r for g in self.posted['/v1/logs']['resourceLogs'] for r in g['scopeLogs'][0]['logRecords']]
             sel = query.get('query', [''])[0]
             rows = []
             for log in logs:
                 body = log['body']['stringValue']
                 if self.drop_event and 'TX-002' in body and 'identity.uin.assigned' in body:
                     continue
-                if 'oaef-s1-simulator' in sel and json.loads(body)['run_id'] in sel:
+                if 'regproc-pkr' in sel and 'idrepo-identity' in sel and json.loads(body)['run_id'] in sel:
                     rows.append([log['timeUnixNano'], body, {}])
             rows.sort(key=lambda r: int(r[0]))
             limit = int(query.get('limit', [2500])[0])
@@ -132,6 +137,10 @@ class V5BackendTest(unittest.TestCase):
         self.assertEqual(verdict['events_collected'], 9)
         self.assertEqual(verdict['trace_count'], 3)
         self.assertTrue(any('/api/traces/' in s for s in server.paths))
+        report = (out / 'report.html').read_text(encoding='utf-8')
+        self.assertIn('<svg', report)                       # sequence diagram from retrieved spans
+        self.assertIn('/explore?schemaVersion=1', report)  # Grafana deep links
+        self.assertIn('STEP-3', report)                     # scenario steps with expected results
         ok = subprocess.run([sys.executable, str(BACKEND), 'verify-bundle', '--out', str(out)],
                             capture_output=True, text=True)
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
@@ -189,12 +198,19 @@ class V5BackendTest(unittest.TestCase):
         self.assertEqual(v['status'], 'PASS')
         self.assertEqual(v['trace_count'], 3)
 
+    def test_broken_trace_context_is_fail(self):
+        _, run, proc, v, _ = self.run_sample(fault='broken_link', tempo_base64=True)
+        self.assertEqual((run.returncode, proc.returncode), (1, 1), proc.stdout + proc.stderr)
+        self.assertEqual(v['classification'], 'TRACE_CONTEXT_BROKEN')
+        self.assertIn('SPAN-PARENT-idrepo-server', {x['check_id'] for x in v['event_span_failures']})
+
     def test_latency_breach_is_fail_not_inconclusive(self):
         _, run, proc, v, _ = self.run_sample(fault='slow')
         self.assertEqual(run.returncode, 1)
         self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
         self.assertEqual(v['status'], 'FAIL')
         self.assertIn('NFR-DEMO-LATENCY', {x['check_id'] for x in v['event_span_failures']})
+        self.assertEqual(v['diagnostic_classes'], ['NFR_VIOLATION'])
 
 
 if __name__ == '__main__':

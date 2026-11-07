@@ -5,6 +5,7 @@ on:
     paths:
       - 'validation/v5_demo.py'
       - 'validation/v5_backend.py'
+      - 'validation/v5_report.py'
       - 'tests/test_v5_slice.py'
       - 'tests/test_v5_backend.py'
       - 'contracts/NIN-001-v5-slice.json'

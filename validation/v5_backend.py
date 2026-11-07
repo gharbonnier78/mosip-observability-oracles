@@ -28,7 +28,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from v5_demo import av, attrs, dump, load, verify
+from v5_demo import KINDS, av, attrs, dump, load, verify
+from v5_report import public_grafana_url, write_report
 
 HASH_FILE = 'evidence-sha256.json'
 METRIC_PREFIX = 'oaef_synthetic_journey_duration'  # S1 baseline; validated against contract below
@@ -102,7 +103,7 @@ def hex_id(value, width):
 
 
 def flatten_traces(trace_docs):
-    spans = []
+    groups_out = []
     for trace_id, doc in trace_docs.items():
         if not doc:
             continue
@@ -110,17 +111,20 @@ def flatten_traces(trace_docs):
         if not isinstance(groups, list):
             raise BackendProblem('Unrecognized Tempo trace response')
         for group in groups:
+            spans = []
             for scope in group.get('scopeSpans', []):
                 for span in scope.get('spans', []):
                     span = dict(span, traceId=hex_id(span.get('traceId'), 32),
                                 spanId=hex_id(span.get('spanId'), 16))
+                    if isinstance(span.get('kind'), str):  # Tempo JSON uses enum names
+                        span['kind'] = KINDS.get(span['kind'], 0)
                     if span.get('parentSpanId'):
                         span['parentSpanId'] = hex_id(span['parentSpanId'], 16)
                     if span['traceId'] != trace_id.lower():
                         raise BackendProblem('Tempo trace result contained another trace ID')
                     spans.append(span)
-    return {'resourceSpans': [{'resource': {'attributes': attrs({'service.name': 'oaef-s1-simulator'})},
-                                'scopeSpans': [{'spans': spans}]}]}
+            groups_out.append({'resource': group.get('resource', {}), 'scopeSpans': [{'spans': spans}]})
+    return {'resourceSpans': groups_out}
 
 
 def normalize_loki(doc, run_id):
@@ -184,8 +188,9 @@ def classify(base_verdict, trace_count, expected_count, log_count, expected_logs
         f['check_id'] in ('EVENT-EFFECT-VALUE', 'EVENT-TRACE-CORRELATION', 'EVENT-PARTIAL-ORDER',
                           'NFR-DEMO-LATENCY') or
         (f['check_id'].startswith('EVENT-EXACT-') and f['actual'] > f['expected']) or
-        (f['check_id'] in ('SPAN-EVENT-COUNT', 'SPAN-TX-COUNT', 'RUN-EVENT-COUNT', 'RUN-SPAN-COUNT')
-            and f['actual'] > f['expected']) or
+        f['check_id'].startswith('SPAN-PARENT-') or
+        ((f['check_id'] in ('SPAN-EVENT-COUNT', 'SPAN-TX-COUNT', 'RUN-EVENT-COUNT', 'RUN-SPAN-COUNT')
+          or f['check_id'].startswith('SPAN-PRESENT-')) and f['actual'] > f['expected']) or
         (f['check_id'] in ('RUN-UNKNOWN-TRANSACTIONS', 'RUN-UNKNOWN-SPAN-TRANSACTIONS')
             and bool(f['actual']))
         for f in failures)
@@ -199,6 +204,25 @@ def classify(base_verdict, trace_count, expected_count, log_count, expected_logs
     else:
         overall = 'PASS'
     return overall
+
+
+def diagnostic_classes(status, failures, metric_checks):
+    """Every applicable diagnostic class, most specific first; several defects can coexist."""
+    if status == 'PASS':
+        return ['S1_TELEMETRY_CONFORMANT']
+    if status == 'INCONCLUSIVE':
+        return ['EVIDENCE_GAP']
+    ids = [f['check_id'] for f in failures]
+    out = []
+    if any(i.startswith('NFR-') for i in ids):
+        out.append('NFR_VIOLATION')
+    if any(i.startswith('SPAN-PARENT-') for i in ids):
+        out.append('TRACE_CONTEXT_BROKEN')
+    if any(m['status'] == 'FAIL' for m in metric_checks):
+        out.append('METRIC_RECONCILIATION_FAILURE')
+    if any(i.startswith(('EVENT-', 'SPAN-PRESENT-', 'SPAN-EVENT-', 'RUN-')) for i in ids):
+        out.append('OBSERVABILITY_VIOLATION')
+    return out or ['OBSERVABILITY_VIOLATION']
 
 
 def observed_metric_checks(series, contract, ledger):
@@ -312,7 +336,9 @@ def collect(out, grafana_url, timeout, poll, limit):
     if contract['metric_name'].replace('.', '_') != METRIC_PREFIX or contract['metric_unit'] != 's':
         raise BackendProblem('S1 metrics adapter does not support this contract metric/version')
     run_id = manifest['run_id']
-    source_spans = emitted['traces']['resourceSpans'][0]['scopeSpans'][0]['spans']
+    source_spans = [s for g in emitted['traces']['resourceSpans'] for sc in g['scopeSpans'] for s in sc['spans']]
+    log_services = sorted({av(g['resource']['attributes'])['service.name'] for g in emitted['logs']['resourceLogs']})
+    selector = '{service_name=~"' + '|'.join(log_services) + '"}'
     trace_ids = sorted({s['traceId'] for s in source_spans})
     if len(trace_ids) != len(ledger):
         raise BackendProblem('One source trace per transaction required for this slice')
@@ -342,9 +368,8 @@ def collect(out, grafana_url, timeout, poll, limit):
                     errors['tempo'] = str(ex)
         try:
             # Run id is in the structured JSON log body, NOT a cardinality-heavy index label.
-            selector = '{service_name="oaef-s1-simulator"} |= "' + run_id + '"'
             loki_doc = client.proxy(uid['loki'], '/loki/api/v1/query_range', {
-                'query': selector, 'start': str(start_ns), 'end': str(end_ns),
+                'query': selector + ' |= "' + run_id + '"', 'start': str(start_ns), 'end': str(end_ns),
                 'limit': str(limit), 'direction': 'forward'})
             log_otlp, malformed, seen = normalize_loki(loki_doc, run_id)
             log_count = len(log_otlp['resourceLogs'][0]['scopeLogs'][0]['logRecords'])
@@ -382,6 +407,7 @@ def collect(out, grafana_url, timeout, poll, limit):
             'verifier_code_sha256': {name: hashlib.sha256(path.read_bytes()).hexdigest()
                   for name, path in [('v5_backend.py', Path(__file__)),
                                      ('v5_demo.py', Path(__file__).with_name('v5_demo.py'))]},
+            'loki_selector': selector,
             'scope': 'synthetic S1 observation only; no actual MOSIP SUT'}
     dump(out / 'backend-meta.json', meta)
     dump(out / 'backend-raw/tempo.json', trace_docs)
@@ -402,8 +428,8 @@ def collect(out, grafana_url, timeout, poll, limit):
                'events_collected': log_count, 'event_span_failures': base['failures'],
                'metric_checks': metric_checks,
                'evidence_sufficiency': 'SUFFICIENT_FOR_S1' if status != 'INCONCLUSIVE' else 'INSUFFICIENT',
-               'classification': 'OBSERVABILITY_VIOLATION' if status == 'FAIL' else
-                                 'EVIDENCE_GAP' if status == 'INCONCLUSIVE' else 'S1_TELEMETRY_CONFORMANT',
+               'classification': diagnostic_classes(status, base['failures'], metric_checks)[0],
+               'diagnostic_classes': diagnostic_classes(status, base['failures'], metric_checks),
                'collected_artifact': 'collected-otel.json', 'backend_query_provenance': 'backend-meta.json'}
     dump(out / 'backend-verdict.json', verdict)
     report = [f'# OAEF V5 — backend observation for {run_id}', '',
@@ -417,7 +443,9 @@ def collect(out, grafana_url, timeout, poll, limit):
               'Important: A missing telemetry record is not proof the business activity did not occur.',
               'Manifest hashes are local integrity checks; not signatures or WORM.']
     (out / 'backend-report.md').write_text('\n'.join(report) + '\n', encoding='utf-8')
+    write_report(out, public_grafana_url(grafana_url), uid)
     seal(out)
+    print('Report:', out / 'report.html')
     print('BACKEND', status, '| traces', trace_count, '/', len(trace_ids),
           '| structured events', log_count, '/', verdict['events_expected'],
           '| metrics', Counter(x['status'] for x in metric_checks), '| attempts', attempts)

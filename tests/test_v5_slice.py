@@ -37,7 +37,8 @@ class V5SyntheticSlice(unittest.TestCase):
                 ('missing', 'EVENT-EXACT-mosip.identity.uin.assigned'),
                 ('wrong_value', 'EVENT-EFFECT-VALUE'),
                 ('slow', 'NFR-DEMO-LATENCY'),
-                ('metric_count', 'METRIC-COUNT')):
+                ('metric_count', 'METRIC-COUNT'),
+                ('broken_link', 'SPAN-PARENT-idrepo-server')):
             with self.subTest(fault=fault):
                 _, p, v = self.run_case(100, fault, 17)
                 self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
@@ -46,7 +47,9 @@ class V5SyntheticSlice(unittest.TestCase):
     def test_aggregate_unchanged_but_each_transaction_invalid(self):
         out, _, _ = self.run_case(3)
         obj = json.loads((out / 'observed.json').read_text())
-        records = obj['logs']['resourceLogs'][0]['scopeLogs'][0]['logRecords']
+        records = next(g for g in obj['logs']['resourceLogs']
+                       if any(a['value'].get('stringValue') == 'idrepo-identity'
+                              for a in g['resource']['attributes']))['scopeLogs'][0]['logRecords']
         tx = lambda r: next(a['value']['stringValue'] for a in r['attributes'] if a['key'] == 'oaef.transaction.id')
         event = 'mosip.identity.uin.assigned'
         row1 = next(r for r in records if tx(r) == 'TX-001' and r['eventName'] == event)
@@ -87,16 +90,17 @@ class V5SyntheticSlice(unittest.TestCase):
                                capture_output=True, text=True, timeout=15)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(set(received), {'/v1/traces', '/v1/logs', '/v1/metrics'})
-        spans = received['/v1/traces']['resourceSpans'][0]['scopeSpans'][0]['spans']
-        self.assertEqual(len(spans), 9)
+        spans = [s for g in received['/v1/traces']['resourceSpans'] for s in g['scopeSpans'][0]['spans']]
+        self.assertEqual(len(spans), 3 * 17)
+        self.assertEqual(len(received['/v1/traces']['resourceSpans']), 6)  # six services
         self.assertLess(abs(int(spans[0]['startTimeUnixNano']) - time.time_ns()), 120_000_000_000)
 
     def test_span_mutation_not_hidden_by_global_count(self):
         out, _, _ = self.run_case(3)
         obj = json.loads((out / 'observed.json').read_text())
-        spans = obj['traces']['resourceSpans'][0]['scopeSpans'][0]['spans']
+        spans = [s for g in obj['traces']['resourceSpans'] for s in g['scopeSpans'][0]['spans']]
         # same total spans, but one wrong logical operation in transaction #1
-        spans[1]['name'] = 'unknown.synthetic.operation'
+        next(s for s in spans if s['name'] == 'mosip.identity.uin.assigned')['name'] = 'unknown.synthetic.operation'
         (out / 'observed.json').write_text(json.dumps(obj))
         p = subprocess.run([sys.executable, str(SCRIPT), 'verify', '--out', str(out)], capture_output=True, text=True)
         v = json.loads((out / 'verdict.json').read_text())

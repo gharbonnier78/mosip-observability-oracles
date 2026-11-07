@@ -25,6 +25,50 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / 'contracts' / 'NIN-001-v5-slice.json'
 EVENTS = ("mosip.registration.packet.received", "mosip.identity.uin.assigned", "mosip.identity.activated")
 BOUNDS = [0.1, 0.25, 0.5, 1, 2, 5, 10]
+KINDS = {'SPAN_KIND_UNSPECIFIED': 0, 'SPAN_KIND_INTERNAL': 1, 'SPAN_KIND_SERVER': 2,
+         'SPAN_KIND_CLIENT': 3, 'SPAN_KIND_PRODUCER': 4, 'SPAN_KIND_CONSUMER': 5}
+
+# Simulated SUT topology for one NIN-001 transaction. Built here, independently of the
+# contract's expected `journey_spans`, so that the two can disagree.
+# (id, service, name, kind, parent id, start ms, end ms); d = upload-to-assignment duration in ms.
+PKR_PATH = 'POST /registrationprocessor/v1/packetreceiver/registrationpackets'
+
+
+def journey(d):
+    return [
+        ('root', 'jarvis-e2e', 'NIN-001 New adult registration no hit', 1, None, 0, d + 60),
+        ('upload', 'jarvis-e2e', PKR_PATH, 3, 'root', 1, 8),
+        ('pkr', 'regproc-pkr', PKR_PATH, 2, 'upload', 2, 7),
+        ('received', 'regproc-pkr', EVENTS[0], 1, 'pkr', 3, 4),
+        ('publish', 'regproc-pkr', 'packet-receiver-bus-out publish', 4, 'pkr', 5, 6),
+        ('process', 'regproc-group1', 'packet-receiver-bus-out process', 5, 'publish', 10, d + 40),
+        ('validate', 'regproc-group1', 'packet validation', 1, 'process', 11, 15),
+        ('dedupe', 'regproc-group1', 'bio-dedupe decision', 1, 'process', 16, 20),
+        ('uin-client', 'regproc-group1', 'GET /v1/idgenerator/uin', 3, 'process', 21, 26),
+        ('uin-server', 'idgenerator', 'GET /v1/idgenerator/uin', 2, 'uin-client', 22, 25),
+        ('idrepo-client', 'regproc-group1', 'POST /idrepository/v1/identity/', 3, 'process', 27, d + 20),
+        ('idrepo-server', 'idrepo-identity', 'POST /idrepository/v1/identity/', 2, 'idrepo-client', 28, d + 19),
+        ('insert', 'idrepo-identity', 'INSERT mosip_idrepo.uin', 3, 'idrepo-server', 29, 31),
+        ('assigned', 'idrepo-identity', EVENTS[1], 1, 'idrepo-server', d + 3, d + 4),
+        ('activated', 'idrepo-identity', EVENTS[2], 1, 'idrepo-server', d + 5, d + 6),
+        ('notify-client', 'regproc-group1', 'POST /v1/notifier/email/send', 3, 'process', d + 21, d + 30),
+        ('notify-server', 'kernel-notification', 'POST /v1/notifier/email/send', 2, 'notify-client', d + 22, d + 29),
+    ]
+
+
+def span_detail(sid, name, kind):
+    """Semantic-convention attributes per span type (synthetic values)."""
+    if kind in (2, 3) and ' /' in name:
+        method, route = name.split(' ', 1)
+        out = {'http.request.method': method, 'http.response.status_code': 200}
+        out['http.route' if kind == 2 else 'url.path'] = route
+        return out
+    if sid == 'insert':
+        return {'db.system.name': 'postgresql', 'db.namespace': 'mosip_idrepo', 'db.operation.name': 'INSERT'}
+    if kind in (4, 5):
+        return {'messaging.system': 'kafka', 'messaging.destination.name': 'packet-receiver-bus-out',
+                'messaging.operation.type': 'send' if kind == 4 else 'process'}
+    return {}
 
 
 def kv(k, v):
@@ -42,6 +86,33 @@ def av(records):
         v = obj['value']
         out[obj['key']] = next(iter(v.values()))
     return out
+
+
+def resource(service):
+    return {'attributes': attrs({'service.name': service,
+                                 'service.namespace': 'jarvis' if service == 'jarvis-e2e' else 'mosip',
+                                 'deployment.environment.name': 'test-int', 'cloud.region': 'dc1',
+                                 'oaef.simulation.mode': 'S1'})}
+
+
+def span_kind(span):
+    k = span.get('kind', 0)
+    return KINDS.get(k, 0) if isinstance(k, str) else int(k)
+
+
+def all_spans(otlp):
+    """Spans with their resource's service.name attached as '_svc'."""
+    out = []
+    for group in otlp['traces']['resourceSpans']:
+        svc = av(group.get('resource', {}).get('attributes', [])).get('service.name')
+        for scope in group['scopeSpans']:
+            out += [dict(s, _svc=svc) for s in scope['spans']]
+    return out
+
+
+def all_logs(otlp):
+    return [r for group in otlp['logs']['resourceLogs'] for scope in group['scopeLogs']
+            for r in scope['logRecords']]
 
 
 def dump(path, data):
@@ -84,43 +155,52 @@ def generate(count, seed, fault, target, out, otlp_url):
     # Offline runs stay byte-for-byte deterministic for a fixed seed and count.
     base = time.time_ns() - 30_000_000_000 if otlp_url else 1_800_000_000_000_000_000
     tx_spacing = 200_000_000 if otlp_url else 5_000_000_000
-    source = attrs({'service.name': 'oaef-s1-simulator', 'service.namespace': 'oaef',
-                    'deployment.environment.name': 'test-int', 'oaef.simulation.mode': 'S1'})
-    spans, logs, ledger = [], [], []
-    durations = []
+    spans_by_svc, logs, ledger = {}, [], []
+    durations, roots = [], []
     for tx in range(1, count + 1):
         tx_id = f'TX-{tx:03d}'
         trace_id = deterministic_id(seed, run_id, tx_id, 'trace', 32)
         value = f'SYN-{seed:06d}-{tx:06d}'
+        rid = f'1000110001{tx:05d}{seed % 10**14:014d}'  # synthetic 29-digit RID shape, not a real RID
         duration_ms = rng.randint(75, 180)
         if fault == 'slow' and tx == target:
             duration_ms = contract['max_upload_to_assignment_ms'] + 150
         durations.append(duration_ms / 1000)
         started = base + tx * tx_spacing
-        prev = ''
-        for i, event in enumerate(EVENTS):
-            span_id = deterministic_id(seed, run_id, tx_id, str(i), 16)
-            t = started + (duration_ms * 1_000_000 * i // 2)
-            span = {'traceId': trace_id, 'spanId': span_id,
-                    'name': event, 'kind': 1,
-                    'startTimeUnixNano': str(t), 'endTimeUnixNano': str(t + 1_000_000),
-                    'attributes': attrs({'oaef.run.id': run_id, 'oaef.transaction.id': tx_id,
-                                         'oaef.simulation.mode': 'S1', 'oaef.synthetic.effect.id': value,
-                                         'test.case.name': 'NIN-001'})}
-            if prev:
-                span['parentSpanId'] = prev
-            spans.append(span)
-            record = {'timeUnixNano': str(t), 'observedTimeUnixNano': str(t),
-                      'severityNumber': 9, 'severityText': 'INFO', 'eventName': event,
-                      'traceId': trace_id, 'spanId': span_id,
-                      'body': {'stringValue': json.dumps({'event_name': event, 'run_id': run_id,
-                            'transaction_id': tx_id, 'synthetic_effect_id': value,
-                            'trace_id': trace_id, 'span_id': span_id,
-                            'result': 'success'}, sort_keys=True, separators=(',', ':'))},
-                      'attributes': attrs({'oaef.run.id': run_id, 'oaef.transaction.id': tx_id,
-                                           'oaef.synthetic.effect.id': value, 'oaef.result': 'success'})}
-            logs.append(record)
-            prev = span_id
+        ids = {}
+        for sid, svc, name, kind, parent, t0, t1 in journey(duration_ms):
+            ids[sid] = deterministic_id(seed, run_id, tx_id, sid, 16)
+            common = {'oaef.run.id': run_id, 'oaef.transaction.id': tx_id,
+                      'oaef.simulation.mode': 'S1', 'test.case.name': 'NIN-001'}
+            if name in EVENTS or sid in ('uin-server', 'idrepo-server'):
+                common['oaef.synthetic.effect.id'] = value   # synthetic UIN surrogate (output value)
+            if sid in ('root', 'upload', 'pkr', 'received', 'publish', 'process', 'idrepo-client'):
+                common['mosip.rid'] = rid                      # synthetic RID (input value)
+            if sid == 'pkr':
+                common['oaef.response.status'] = 'PACKET_RECEIVED'
+            span = {'traceId': trace_id, 'spanId': ids[sid], 'name': name, 'kind': kind,
+                    'startTimeUnixNano': str(started + t0 * 1_000_000),
+                    'endTimeUnixNano': str(started + t1 * 1_000_000),
+                    'attributes': attrs({**common, **span_detail(sid, name, kind)})}
+            if parent:
+                span['parentSpanId'] = ids[parent]
+                if fault == 'broken_link' and tx == target and sid == 'idrepo-server':
+                    # Lost context propagation: the server span no longer points to its caller.
+                    span['parentSpanId'] = deterministic_id(seed, run_id, tx_id, 'lost-parent', 16)
+            spans_by_svc.setdefault(svc, []).append(span)
+            if sid == 'root':
+                roots.append((duration_ms / 1000, trace_id, ids[sid], started, tx_id))
+            if name in EVENTS:
+                t = str(started + t0 * 1_000_000)
+                logs.append({'_svc': svc, 'timeUnixNano': t, 'observedTimeUnixNano': t,
+                             'severityNumber': 9, 'severityText': 'INFO', 'eventName': name,
+                             'traceId': trace_id, 'spanId': ids[sid],
+                             'body': {'stringValue': json.dumps({'event_name': name, 'run_id': run_id,
+                                   'transaction_id': tx_id, 'synthetic_effect_id': value,
+                                   'trace_id': trace_id, 'span_id': ids[sid],
+                                   'result': 'success'}, sort_keys=True, separators=(',', ':'))},
+                             'attributes': attrs({'oaef.run.id': run_id, 'oaef.transaction.id': tx_id,
+                                                  'oaef.synthetic.effect.id': value, 'oaef.result': 'success'})})
         ledger.append({'transaction_id': tx_id, 'synthetic_effect_id': value,
                        'outcome': 'activated', 'upload_to_assignment_ms': duration_ms})
     if fault in ('missing', 'duplicate', 'wrong_value'):
@@ -158,18 +238,34 @@ def generate(count, seed, fault, target, out, otlp_url):
         # Corrupt the business-to-metric count without constructing an invalid
         # histogram: an extra 0.12s measurement is counted in the first bucket.
         bucket_counts[1] = str(int(bucket_counts[1]) + 1)
+    # Exemplars: the slowest transaction of each non-empty bucket, as a navigation aid to its trace.
+    # Not evidence of count completeness.
+    exemplars, seen_buckets = [], set()
+    for d, trace_id, span_id, started, tx_id in sorted(roots, reverse=True):
+        bucket = next((i for i, b in enumerate(BOUNDS) if d <= b), len(BOUNDS))
+        if bucket not in seen_buckets:
+            seen_buckets.add(bucket)
+            exemplars.append({'timeUnixNano': str(started), 'asDouble': d, 'traceId': trace_id, 'spanId': span_id,
+                              'filteredAttributes': attrs({'oaef.transaction.id': tx_id})})
     metric = {'name': contract['metric_name'], 'unit': contract['metric_unit'],
               'histogram': {'aggregationTemporality': 2, 'dataPoints': [{
                   'attributes': attrs({'oaef.simulation.mode': 'S1', 'oaef.run.id': run_id}),
                   'startTimeUnixNano': str(base),
                   'timeUnixNano': str(base + (count + 1) * tx_spacing),
                   'count': str(actual_count), 'sum': sum(durations) + (0.12 if fault == 'metric_count' else 0),
-                  'explicitBounds': BOUNDS, 'bucketCounts': bucket_counts}]}}
-    otlp = {'traces': {'resourceSpans': [{'resource': {'attributes': source},
-                                        'scopeSpans': [{'scope': {'name': 'oaef.v5.s1'}, 'spans': spans}]}]},
-            'logs': {'resourceLogs': [{'resource': {'attributes': source},
-                                      'scopeLogs': [{'scope': {'name': 'oaef.v5.s1'}, 'logRecords': logs}]}]},
-            'metrics': {'resourceMetrics': [{'resource': {'attributes': source},
+                  'explicitBounds': BOUNDS, 'bucketCounts': bucket_counts, 'exemplars': exemplars}]}}
+    logs_by_svc = {}
+    for r in logs:
+        logs_by_svc.setdefault(r.pop('_svc'), []).append(r)
+    otlp = {'traces': {'resourceSpans': [{'resource': resource(svc),
+                                         'scopeSpans': [{'scope': {'name': 'oaef.v5.s1'}, 'spans': spans}]}
+                                        for svc, spans in spans_by_svc.items()]},
+            'logs': {'resourceLogs': [{'resource': resource(svc),
+                                      'scopeLogs': [{'scope': {'name': 'oaef.v5.s1'}, 'logRecords': rows}]}
+                                     for svc, rows in sorted(logs_by_svc.items())]},
+            'metrics': {'resourceMetrics': [{'resource': {'attributes': attrs({
+                            'service.name': 'oaef-s1-simulator', 'service.namespace': 'oaef',
+                            'deployment.environment.name': 'test-int', 'oaef.simulation.mode': 'S1'})},
                                             'scopeMetrics': [{'scope': {'name': 'oaef.v5.s1'}, 'metrics': [metric]}]}]}}
     dump(out / 'contract.json', contract)
     dump(out / 'ledger.json', ledger)
@@ -179,7 +275,7 @@ def generate(count, seed, fault, target, out, otlp_url):
                                   'scope': contract['scope'], 'contract_sha256': hashlib.sha256(CONTRACT.read_bytes()).hexdigest(),
                                   'contract_snapshot_sha256': hashlib.sha256((out / 'contract.json').read_bytes()).hexdigest(),
                                   'otlp_status': 'not_requested' if not otlp_url else 'attempted'})
-    print('run id:', run_id, '| example trace id:', spans[0]['traceId'])
+    print('run id:', run_id, '| example trace id:', roots[0][1])
     if otlp_url:
         emit(otlp_url, otlp)  # offline verdict below does not prove remote ingestion
     return verify(out)
@@ -190,23 +286,22 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
     ledger = load(out / 'ledger.json')
     otlp = load(out / observed_name)
     manifest = load(out / 'manifest.json')
+    expected_spans = contract['journey_spans']
     checks = []
 
-    def check(code, actual, expected, tx=None):
+    def check(code, actual, expected, tx=None, ref=None):
         ok = actual == expected
         if not ok:
             checks.append({'check_id': code, 'transaction_id': tx, 'expected': expected,
-                           'actual': actual, 'status': 'FAIL'})
+                           'actual': actual, 'status': 'FAIL', **({'ref': ref} if ref else {})})
         return ok
 
-    records = [r for group in otlp['logs']['resourceLogs'] for scope in group['scopeLogs']
-               for r in scope['logRecords']]
-    spans = [s for group in otlp['traces']['resourceSpans'] for scope in group['scopeSpans']
-             for s in scope['spans']]
+    records = all_logs(otlp)
+    spans = all_spans(otlp)
     all_ids = [x['transaction_id'] for x in ledger]
     check('RUN-LEDGER-CARDINALITY', len(ledger), manifest['transactions'])
     check('RUN-UNIQUE-TRANSACTIONS', len(set(all_ids)), manifest['transactions'])
-    check('RUN-SPAN-COUNT', len(spans), len(ledger) * len(contract['required_events']))
+    check('RUN-SPAN-COUNT', len(spans), len(ledger) * len(expected_spans))
     check('RUN-EVENT-COUNT', len(records), len(ledger) * len(contract['required_events']))
     by_tx = {}
     span_by_tx = {}
@@ -218,26 +313,40 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
         tx = entry['transaction_id']
         rows = by_tx.get(tx, [])
         tx_spans = span_by_tx.get(tx, [])
-        check('SPAN-TX-COUNT', len(tx_spans), len(contract['required_events']), tx)
+        check('SPAN-TX-COUNT', len(tx_spans), len(expected_spans), tx)
         check('SPAN-TX-TRACE', len({s['traceId'] for s in tx_spans}), 1, tx)
+        # Span tree: each expected span exactly once (service, name, kind), under the expected parent.
+        by_key = {}
+        for s in tx_spans:
+            by_key.setdefault((s['_svc'], s['name'], span_kind(s)), []).append(s)
+        matched = {}
+        for e in expected_spans:
+            found = by_key.get((e['service'], e['name'], e['kind']), [])
+            if check('SPAN-PRESENT-' + e['id'], len(found), 1, tx, e['id']):
+                matched[e['id']] = found[0]
+        for e in expected_spans:
+            if e['id'] in matched and (e['parent'] is None or e['parent'] in matched):
+                want = matched[e['parent']]['spanId'] if e['parent'] else ''
+                check('SPAN-PARENT-' + e['id'], matched[e['id']].get('parentSpanId') or '', want, tx, e['id'])
         for name in contract['required_events']:
-            check('SPAN-EVENT-COUNT', len([s for s in tx_spans if s['name'] == name]), 1, tx)
+            check('SPAN-EVENT-COUNT', len([s for s in tx_spans if s['name'] == name]), 1, tx, name)
             selected = [r for r in rows if r.get('eventName') == name]
-            check('EVENT-EXACT-' + name, len(selected), 1, tx)
+            check('EVENT-EXACT-' + name, len(selected), 1, tx, name)
             for r in selected:
                 a = av(r['attributes'])
                 check('EVENT-EFFECT-VALUE', a.get('oaef.synthetic.effect.id'),
-                      entry['synthetic_effect_id'], tx)
+                      entry['synthetic_effect_id'], tx, name)
                 check('EVENT-TRACE-CORRELATION',
                       any(s['traceId'] == r['traceId'] and s['spanId'] == r['spanId']
-                          and av(s['attributes']).get('oaef.transaction.id') == tx for s in spans), True, tx)
+                          and av(s['attributes']).get('oaef.transaction.id') == tx for s in spans), True, tx, name)
         starts = {r['eventName']: int(r['timeUnixNano']) for r in rows
                   if r.get('eventName') in contract['required_events']}
         if len(starts) == len(contract['required_events']):
             check('EVENT-PARTIAL-ORDER', [starts[x] for x in contract['required_events']] ==
                   sorted(starts.values()), True, tx)
-        check('NFR-DEMO-LATENCY', entry['upload_to_assignment_ms'] <=
-              contract['max_upload_to_assignment_ms'], True, tx)
+        if entry['upload_to_assignment_ms'] > contract['max_upload_to_assignment_ms']:
+            check('NFR-DEMO-LATENCY', {'upload_to_assignment_ms': entry['upload_to_assignment_ms']},
+                  {'max_upload_to_assignment_ms': contract['max_upload_to_assignment_ms']}, tx)
     check('RUN-UNKNOWN-TRANSACTIONS', sorted(set(by_tx) - set(all_ids)), [])
     check('RUN-UNKNOWN-SPAN-TRANSACTIONS', sorted(set(span_by_tx) - set(all_ids)), [])
     if check_metrics:
@@ -255,10 +364,12 @@ def verify(out, observed_name='observed.json', verdict_name='verdict.json', chec
                'count_expected_transactions': len(ledger),
                'count_observed_events': len(records),
                'count_expected_events': len(ledger) * len(contract['required_events']),
+               'count_observed_spans': len(spans),
+               'count_expected_spans': len(ledger) * len(expected_spans),
                'status': status, 'failures': checks}
     dump(out / verdict_name, verdict)
     print(f"{status}: {len(ledger)} tx; expected events {verdict['count_expected_events']}; "
-          f"observed {len(records)}; failed checks {len(checks)}")
+          f"observed {len(records)}; spans {len(spans)}/{verdict['count_expected_spans']}; failed checks {len(checks)}")
     for x in checks[:8]:
         print('  ', x['check_id'], x.get('transaction_id'), 'expected', x['expected'], 'actual', x['actual'])
     return status == 'PASS'
@@ -270,7 +381,7 @@ def main(argv=None):
     run = sub.add_parser('run')
     run.add_argument('--count', type=int, default=100)
     run.add_argument('--seed', type=int, default=20261105)
-    run.add_argument('--fault', choices=['none', 'duplicate', 'missing', 'wrong_value', 'slow', 'metric_count'], default='none')
+    run.add_argument('--fault', choices=['none', 'duplicate', 'missing', 'wrong_value', 'slow', 'metric_count', 'broken_link'], default='none')
     run.add_argument('--target', type=int, default=1)
     run.add_argument('--out', type=Path, required=True)
     run.add_argument('--otlp', help='Optional OTLP/HTTP collector base URL')

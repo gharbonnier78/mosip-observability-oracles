@@ -1,15 +1,39 @@
 {
   "name": "OAEF live demo",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "hostRequirements": { "cpus": 2, "memory": "8gb" },
-  "containerEnv": { "GF_ADMIN_PASSWORD": "change-me" },
-  "postStartCommand": "docker compose -f validation/demo/docker-compose.yml up -d",
-  "forwardPorts": [3000, 4318],
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "containerEnv": {
+    "GF_ADMIN_PASSWORD": "change-me"
+  },
+  "postStartCommand": "bash validation/demo/start_stack.sh",
+  "forwardPorts": [
+    3000,
+    4318,
+    8080
+  ],
   "portsAttributes": {
-    "3000": { "label": "Grafana", "onAutoForward": "notify" },
-    "4318": { "label": "OTLP HTTP", "onAutoForward": "silent" }
+    "3000": {
+      "label": "Grafana",
+      "onAutoForward": "notify"
+    },
+    "4318": {
+      "label": "OTLP HTTP",
+      "onAutoForward": "silent"
+    },
+    "8080": {
+      "label": "OAEF test reports",
+      "onAutoForward": "silent"
+    }
   },
   "customizations": {
-    "vscode": { "extensions": ["redhat.vscode-yaml", "ms-python.python"] }
+    "vscode": {
+      "extensions": [
+        "redhat.vscode-yaml",
+        "ms-python.python"
+      ]
+    }
   }
 }
