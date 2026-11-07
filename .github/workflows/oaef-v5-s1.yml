@@ -1,10 +1,12 @@
-name: OAEF V5 S1 contract and mutation checks
+name: OAEF V5 S1 and backend evidence regression
 
 on:
   pull_request:
     paths:
       - 'validation/v5_demo.py'
+      - 'validation/v5_backend.py'
       - 'tests/test_v5_slice.py'
+      - 'tests/test_v5_backend.py'
       - 'contracts/NIN-001-v5-slice.json'
       - '.github/workflows/oaef-v5-s1.yml'
   workflow_dispatch:
