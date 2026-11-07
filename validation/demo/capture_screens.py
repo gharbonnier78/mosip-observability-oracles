@@ -12,6 +12,7 @@ Index: <out>/screenshots/index.json (file, caption, url, status). Screenshots ar
 illustrate the evidence, they are not part of the sealed bundle and never change a verdict.
 """
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -89,12 +90,14 @@ def main():
     index = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        page = browser.new_page(viewport=VIEW)
-        page.goto(f'{a.grafana}/login')
-        page.fill('input[name="user"]', 'admin')
-        page.fill('input[name="password"]', password)
-        page.click('button[type="submit"]')
-        page.wait_for_url(lambda u: '/login' not in u, timeout=30000)
+        # Basic authentication on every request (Grafana auth.basic): no dependency on the login form's markup.
+        token = base64.b64encode(f'admin:{password}'.encode()).decode()
+        context = browser.new_context(viewport=VIEW, extra_http_headers={'Authorization': f'Basic {token}'})
+        page = context.new_page()
+        page.goto(f'{a.grafana}/api/user', wait_until='load')
+        if '"login":"admin"' not in page.content().replace(' ', ''):
+            print('Grafana authentication failed', file=sys.stderr)
+            return 2
         for rel, caption, url, kind in shots:
             target = out / rel
             target.parent.mkdir(parents=True, exist_ok=True)
