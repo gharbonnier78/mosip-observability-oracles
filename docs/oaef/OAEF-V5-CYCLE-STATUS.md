@@ -1,7 +1,7 @@
 # OAEF — full-cycle status against the deck (2026-11-07, branch `docs/oaef-v5-model-to-evidence-demo`, after C1)
 
 Question: is the cycle promised by *Observability-First Evidence-Based Testing* (slides 7 "From use case to oracle", 8 "Anatomy of one step", 16 "The loop", 18–39 worked example) implemented end to end?
-**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 40–59).
+**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 40–63).
 
 Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated** = in the executed contract, reported `NOT_EVALUATED` · **Specified** = written and reviewed, not executed · **Missing** = neither.
 
@@ -52,19 +52,26 @@ Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated**
 | Deck | section 6 added: real run 42420471946, process, specification, injection, validation, evidence screenshots, GenAI vs script, status; slides 18–35 remain the target design (marked illustrative where so) |
 | `OAEF-SPEC-001` / `OAEF-VTS-001` (Word/PDF) | predate V5; not updated (→ C7) |
 | V5 addendum `docs/oaef/OAEF-V5-MODEL-TO-EVIDENCE-ADDENDUM.md` | missing (→ C7) |
-| Perspectives with NIN Registration use cases (Weaver, OATs, in-toto + Sigstore), including an executed bundle-forgery test | user guide §13, deck slides 54–57; tools not yet run |
+| Perspectives with NIN Registration use cases (Weaver, OATs, in-toto + Sigstore), including an executed bundle-forgery test | user guide §13–17, deck slides 54–61; tools not yet run |
 | Signal communication diagrams (Metric, Trace, Logs) | `docs/diagrams/nin-001-signal-communication.drawio`, each element marked demonstrated / target / open; deck slides 33–35 |
 | draw.io pages 3–6 generated from the contract | proposed, not done |
 
 ## 5. Plan to close the cycle
 
+Proposed order, revised 2026-11-08 for the real use case (NIMS 2.0 WP0, user guide §15); team capacity not assessed. Wave 1: to the end of 2026. Wave 2: after the Gold observability instance is ready. Wave 3: then.
+
 | Step | Closes | Done when | Status |
 |---|---|---|---|
 | **C1** compile `NIN-001.oracle.yaml` → executed contract, traceability ids | §1 rows 2, 4, 6 | every check cites requirement + model element; compiled contract is the default | **Done** (C1a–C1d), live run 42420471946 |
-| **C2** REST messages + business rules in the simulator and oracle | §1 rows 3, 8 | request/response per step in the report; UIN/VID/RID formats and Verhoeff checked | next |
-| **C3** spec metrics M1–M5, ENV1–2, X1 (baseline/delta) | §1 row 9, loop 1 | each metric assertion of the YAML evaluated live | to do |
-| **C4** model as source (XMI from Modelio) → paths → catalogue scenarios generated | §1 rows 1, 5 | ≥ nominal, dedupe and validation families run; requirement and branch coverage published | to do (needs the XMI export) |
-| **C5** state before/after (DB) and audit, simulated in S1 | §1 row 7, audit, loop 4 | DB and audit checks and faults detected; `missing` becomes decidable | to do |
-| **C6** deck verdict classes, per-axis report, first source, RCA hints | loop 5, §3 | report reproduces slide 36 with real data; slide 37 hints per class | to do |
-| **C7** documentation: V5 addendum, SPEC/VTS update | §4 | documents consistent with the executed system | partly (guide, runbook, deck, process models done) |
-| (later) signing and WORM storage; technical user and vault; S2 on an instrumented MOSIP | loop 6, real SUT | — | to do |
+| **C2** REST messages + business rules in the simulator and oracle | §1 rows 3, 8 | request/response per step in the report; UIN/VID/RID formats and Verhoeff checked | wave 2 |
+| **C3** spec metrics M1–M5, ENV1–2, X1 (baseline/delta) | §1 row 9, loop 1 | each metric assertion of the YAML evaluated live | wave 1 |
+| **C4** model as source (XMI from Modelio) → paths → catalogue scenarios generated | §1 rows 1, 5 | ≥ nominal, dedupe and validation families run; requirement and branch coverage published | wave 3 (needs the XMI export) |
+| **C5** state before/after (DB) and audit, simulated in S1 | §1 row 7, audit, loop 4 | DB and audit checks and faults detected; `missing` becomes decidable | wave 2 |
+| **C6** deck verdict classes, per-axis report, first source, RCA hints | loop 5, §3 | report reproduces slide 36 with real data; slide 37 hints per class | wave 3 |
+| **C7** documentation: V5 addendum, SPEC/VTS update | §4 | documents consistent with the executed system | partly (guide, runbook, deck, process models done); rest wave 3 |
+| **P1** supplier rules, NIN-001 registry, Weaver pilot on one delivery | delivery gate (WP0-DQ-02) | a renamed `mosip.rid` stops a sample build | wave 1, first |
+| **P2** bundle signature (in-toto + cosign) | loop 6 | the forged bundle of user guide §13.4 is rejected | wave 1 |
+| **P3** real-run adapter, contract tolerance, OpenTelemetry Demo slice | oracle on telemetry we did not write | user guide §14 criteria met | wave 1 |
+| **P4** OATs on the collector configuration | loop 1 (collector stamping) | NIN-083 and NIN-092 fail and pass as expected | wave 1, once Gold is being built |
+| **S2** NIN-001 on an instrumented MOSIP | real SUT | real verdict with sealed evidence | wave 2, after Gold is ready |
+| **P5** write-once storage; technical user and vault | loop 6 | WP0-INF-02 acceptance met | wave 3 |

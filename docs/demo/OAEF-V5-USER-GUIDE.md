@@ -380,7 +380,7 @@ Further points a reviewer will raise, and the current answer:
 | seven verdict classes, infra window, first source | C6 |
 | SLA definitions (maximum or percentile, load, end points), budget ownership | specification review with the authority |
 | real behaviour and real performance | S2 on an instrumented MOSIP, with a load profile |
-| signature and write-once storage | evidence platform (later) |
+| signature and write-once storage | P2 and P5, see §17 |
 
 ## 13. Perspectives: four open-source additions, applied to NIN Registration
 
@@ -519,10 +519,102 @@ cosign verify-blob-attestation --bundle duplicate.sigstore.json --key <public-ke
 
 Tracetest popularised assertions on spans, and its selector language is worth reading. It works on traces, so it would not see the duplicate on TX-017, which is a log event. Its last release dates from October 2024 and its last commit from June 2025. Its licence is mixed (MIT and a Tracetest Community License, per file). Use it as a comparison point in a publication, not as a component.
 
-### 13.6 Suggested order
+### 13.6 Where these additions go
 
-| Order | Addition | Why then | Done when |
+They are part of the plan in §17: Weaver with the supplier rules (P1), signature (P2), OATs (P4). The rehearsal on real telemetry is in §14.
+
+## 14. Rehearsal on real telemetry: a slice of the OpenTelemetry Demo
+
+**Status: framed, not started.** This is a rehearsal of the method before the real use case (§15). It says nothing about MOSIP.
+
+**Why.** Today the same code writes the signals and checks them, so every transaction has exactly the same shape. The oracle has proved that it detects injected defects. It has never had to stay silent on a healthy system that behaves irregularly (retries, optional spans, varying order). That false-alarm rate is the main unknown of an exact oracle.
+
+**What stays the same.** The stack (`grafana/otel-lgtm`), the oracle engine, sealing, reports and Allure. Only the system under test changes: the OpenTelemetry Demo (Apache-2.0) replaces the S1 simulator. To confirm when starting: running the demo without its own observability backends and sending its collector output to our stack (the demo provides `otelcol-config-extras.yml`).
+
+**Scope.** One journey (checkout), one small requirement set written for it, 100 healthy orders, then four fault flags. Kafka must stay in the deployment, so the demo's minimal mode (about 3 GB) cannot be used; the full deployment needs about 6 GB of memory and 14 GB of disk.
+
+| Demo fault flag | What it rehearses on NIN Registration | Expected outcome |
+|---|---|---|
+| `paymentFailure` | NIN-013, ABIS failure | Failed transactions named, correct class |
+| `paymentUnreachable` | NIN-014, ABIS does not reply | Infrastructure-side class, not a product defect |
+| `kafkaQueueProblems` | NIN-070, Kafka trouble during processing | Delay detected, no lost transaction reported |
+| `emitRawPii` | NF-07, personal data in clear in signals | Forbidden-value check fails |
+
+**Work needed.**
+
+| Item | Why | Reused on MOSIP |
+|---|---|---|
+| Adapter for real runs: `collect` accepts only S1 runs today | The simulator is the only accepted source | Yes |
+| Correlation from a business key (the order identifier) instead of `oaef.transaction.id` | A real application does not set our test attribute | Yes: same problem as the RID |
+| Tolerance in the contract: optional, repeated and unordered elements, each stated explicitly | Real systems are not identical from one transaction to the next | Yes: the most valuable part |
+| Driver that places orders and builds the expected ledger | Replaces the simulator's ledger | Partly: Jarvis on MOSIP |
+| Checkout oracle and small requirement set | No requirement model exists for the demo | No |
+
+**Done when.**
+- 100 healthy orders give no unexplained FAIL. Each false alarm is either fixed by a stated tolerance or recorded as an oracle limit, and the count is published.
+- Each of the four flags is detected and classified as expected.
+- The tolerance rules are reviewed, because each one is also a way to miss a defect.
+
+**What it does not bring.** No evidence about MOSIP, ABIS, biometrics or NIN rules, and no progress on WP0 acceptance.
+
+## 15. The real use case: NIMS 2.0 WP0
+
+The demonstrator's first real use is the WP0 shared observability, audit and evidence layer, with NIN-001 as its acceptance test (see the [WP0 requirements](../wp0-shared-platform-requirements.md)). Each increment is tied to a moment where the platform makes it usable.
+
+| Platform moment | What becomes possible | Tool or step | WP0 phase |
 |---|---|---|---|
-| 1 | Signature of the bundle | Smallest change; closes a limit we have demonstrated | The forged bundle of §13.4 is rejected |
-| 2 | Weaver registry for NIN-001 | Needed before supplier intake | A renamed `mosip.rid` stops a sample build |
-| 3 | OATs on the Alloy configuration | Useful as soon as the Gold pipeline exists | NIN-083 and NIN-092 fail and pass as expected |
+| Supplier pre-integration bench available | Check signals on each delivery. No central telemetry is needed: Weaver listens to an OTLP stream | Supplier rules (§16), Weaver | WP0.2 |
+| First MOSIP baseline on Bronze | Local evidence only. Agent, extension and context propagation can be tried | WP0.2 instrumentation | WP0.2 |
+| Gold observability instance being built | Test stamping and routing before data arrives | OATs on the collector configuration | WP0.1 |
+| Gold ready (end of 2026) | Bronze collectors can send to Gold | Canary from each platform | WP0.1 exit |
+| After Gold is ready | First NIN-001 evidence on real MOSIP | Same oracle, real-run adapter (§14), signed bundle | WP0.2 and WP0.3 exit |
+
+**Constraint to state.** End-to-end MOSIP evidence needs central telemetry, which depends on Gold being ready at the end of 2026. A real NIN-001 verdict before that date would need an agreed local stack on Bronze, as a programme decision. Otherwise the year-end objective is a ready chain: supplier gate, signed evidence and rehearsed oracle, with the first real verdict just after.
+
+**Exit criteria.** They are those of the WP0 phases: NIN-001 signal contract at the agreed threshold on TEST (WP0.2), and NIN-001 PASS with sealed, replayable evidence (WP0.3).
+
+## 16. Rules for suppliers
+
+**Status: draft for review by the Test Authority.** The rules become binding only once the programme adopts them in the delivery process. Rules marked *perspective* depend on tools not yet tried, and should be piloted on one delivery before being required.
+
+**Principle.** A delivery is not done until its signal contract passes (WP0-DQ-02). The supplier proves it on their side first, and the platform verifies.
+
+| Rule | Requirement | Proof delivered | Checked by | Source |
+|---|---|---|---|---|
+| S-01 | Fill the OTEL / audit / labels field of the deployment contract, with the signal contract reference and version | Contract row | Contract review, before install is allowed | WP0-DQ-02 |
+| S-02 | Use the pinned OTel agent version of the platform release; no local override | Build manifest | Evidence manifest | WP0-SW-01, SW-11 |
+| S-03 | Expose service name, version and commit. Do not hard-code environment or site | Resource attributes in a sample | Weaver *(perspective)*, oracle | WP0-SW-11, NF-08 |
+| S-04 | Use only registered span, event, attribute and metric names. Any new name goes through a change request | Sample run | Weaver *(perspective)*, oracle | WP0-DQ-01, SW-12 |
+| S-05 | Propagate context across HTTP, Kafka and ActiveMQ; add a span link at asynchronous breaks | Sample trace across the boundary | Oracle | WP0-SW-03, SW-04 |
+| S-06 | Carry business keys (`mosip.rid`, `mosip.uin_hash`). Never send NIN, VID, phone or email in clear in any signal | Sample run | Oracle forbidden-value checks | WP0-SW-02, NF-07 |
+| S-07 | Write structured logs with `trace_id` and `span_id` | Log sample | Oracle | WP0-SW-06 |
+| S-08 | Add `trace_id` and `span_id` to audit events | Audit sample | Oracle (after C5) | WP0-SW-05, F-10 |
+| S-09 | Use no identifiers as metric labels | Metric sample | Cardinality check | WP0-DQ-03 |
+| S-10 | *Perspective.* Run `weaver registry live-check` in supplier CI on the reference scenario, with the published registry version. Any violation stops the delivery | Live-check report | Platform re-runs on the bench | §13.2 |
+| S-11 | *Perspective.* Sign the delivery evidence (live-check report, build manifest) with the supplier's own key | Signed attestation | Signature verification | WP0-SEC-06, §13.4 |
+| S-12 | Pass the signal contract on the pre-integration bench before promotion; pass NIN-001 once central telemetry exists | Verdict and sealed bundle | OAEF oracle | WP0-DQ-02 |
+
+**Exceptions.** A rule that cannot be met is recorded as an exception, with owner, reason and end date. Example from the WP0 open decisions: if the ABIS vendor cannot propagate `traceparent` through its queues, the boundary is a span link only.
+
+**What the platform owes suppliers.** A versioned registry; a reference scenario and sample payload; the bench endpoint; the exact checks and their results for each delivery; and a change process for the registry.
+
+**Who owns what.** A failed check goes to the owner shown by its diagnostic class: a supplier fixes its signals or its product, the platform team fixes the pipeline, and the Test Authority fixes the oracle or the contract.
+
+## 17. Plan: C2 to C7 and the perspectives
+
+**Proposed order, to validate; team capacity has not been assessed.** The year-end milestone moves first what the real platform needs. C2 and C5 follow because they are worth more against real MOSIP answers and databases than against a simulator. The full plan and its status are in the [cycle status](../oaef/OAEF-V5-CYCLE-STATUS.md).
+
+| Wave | Step | Content | Done when |
+|---|---|---|---|
+| 1, to end of 2026 | P1 | Supplier rules, NIN-001 registry, Weaver pilot on one delivery | A renamed `mosip.rid` stops a sample build |
+| 1 | P2 | Bundle signature (in-toto + cosign) | The forged bundle of §13.4 is rejected |
+| 1 | P3 | Real-run adapter, contract tolerance, OTel Demo slice (§14) | Criteria of §14 met |
+| 1 | C3 | Specification metrics, environment labels | Each metric assertion evaluated live |
+| 1 | P4 | OATs on the collector configuration, once Gold is being built | NIN-083 and NIN-092 fail and pass as expected |
+| 2, after Gold is ready | S2 | NIN-001 on instrumented MOSIP | Real verdict with sealed evidence |
+| 2 | C2 | REST messages, business rules | NIN, VID and RID rules checked |
+| 2 | C5 | DB state, audit, notification evidence | DB and audit faults detected |
+| 3 | C6 | Seven verdict classes, first source, RCA hints | Report reproduces the target |
+| 3 | C4 | Scenarios generated from the model | Nominal, dedupe and validation families run |
+| 3 | P5 | Write-once storage, technical user, vault | WP0-INF-02 acceptance met |
+| 3 | C7 | Remaining documentation | Documents match the system |
