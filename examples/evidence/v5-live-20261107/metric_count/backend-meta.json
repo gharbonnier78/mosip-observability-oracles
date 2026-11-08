@@ -1,0 +1,26 @@
+{
+  "attempts": 1,
+  "backend_errors": {},
+  "loki_limit": 2500,
+  "loki_truncated_possible": false,
+  "metric_series": 10,
+  "parse_errors": [],
+  "parsed_log_records": 300,
+  "queried_base": "http://localhost:3000",
+  "queried_log_records": 300,
+  "queried_trace_count": 100,
+  "query_end_ns": "1794069153010156354",
+  "query_start_ns": "1794069063031156354",
+  "returned_trace_count": 100,
+  "scope": "synthetic S1 observation only; no actual MOSIP SUT",
+  "source": "Grafana proxy Tempo/Loki/Prometheus API",
+  "uids": {
+    "loki": "loki",
+    "prometheus": "prometheus",
+    "tempo": "tempo"
+  },
+  "verifier_code_sha256": {
+    "v5_backend.py": "0d334acffeff9740de13de532cb377044e2e89b8c8a998e5ac1a2c4606f5d2f5",
+    "v5_demo.py": "ed23c163f337ddd0eab3a1160883ef5690cfc6ae52b85fd79f13e8538577e8da"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "attempts": 1,
+  "backend_errors": {},
+  "loki_limit": 2500,
+  "loki_selector": "{service_name=~\"idrepo-identity|regproc-pkr\"}",
+  "loki_truncated_possible": false,
+  "metric_series": 10,
+  "parse_errors": [],
+  "parsed_log_records": 300,
+  "queried_base": "http://localhost:3000",
+  "queried_log_records": 300,
+  "queried_trace_count": 100,
+  "query_end_ns": "1794071227854124662",
+  "query_start_ns": "1794071137816124662",
+  "returned_trace_count": 100,
+  "scope": "synthetic S1 observation only; no actual MOSIP SUT",
+  "source": "Grafana proxy Tempo/Loki/Prometheus API",
+  "uids": {
+    "loki": "loki",
+    "prometheus": "prometheus",
+    "tempo": "tempo"
+  },
+  "verifier_code_sha256": {
+    "v5_backend.py": "40eb4c1dd0e079733bd9c9144150d1bca8410eed3bca8bbf25ba94e1e4284f2d",
+    "v5_demo.py": "29f48698f43f649ec315fb0af4b39366ef0edcc7ea54206e07af3dfff50da0cd"
+  }
+}

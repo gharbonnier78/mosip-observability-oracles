@@ -53,9 +53,13 @@ The script prints the **replayed trace id** and the **packet-receiver span id**.
 3. **Metric and exemplar** — Explore → Prometheus/Mimir: `http_server_request_duration_seconds_bucket{service_name="regproc-pkr"}` (label may be `job="mosip/regproc-pkr"` depending on the backend) with *Exemplars* on. Expected: an exemplar whose trace id is the replayed one.
 4. **Oracle** — open `oracles/NIN-001.oracle.yaml` beside the trace; match `PKR_SERVER` (name, kind 2, parent = Jarvis client span, `http.response.status_code` 200, `mosip.rid`). Say clearly: the evidence collector and oracle engine are not built yet (WP0.3).
 
+## V5 demonstrator (S1 synthetic journeys, S2-read backend oracle)
+
+On branch `docs/oaef-v5-model-to-evidence-demo`: `bash validation/demo/run_v5_demo.sh`. Procedure, 15-minute script and recovery: `docs/demo/OAEF-V5-LIVE-DEMO-RUNBOOK.md`.
+
 ## Automated check
 
-`bash validation/demo/check.sh` replays NIN-001 and verifies, through the Grafana API, that the trace has 7 spans, the packet-receiver log record exists and a metric exemplar points to the replayed trace. It ends with `RESULT: PASS`.
+`bash validation/demo/check.sh` replays NIN-001 and verifies, through the Grafana API, that the trace has 7 spans, the packet-receiver log record exists and a metric exemplar points to the replayed trace. It ends with `RESULT: PASS` (exit 0) or `RESULT: FAIL` (exit 1). It is an S0 connectivity smoke, not a scenario oracle.
 
 Last rehearsal: 2026-10-19, GitHub Codespaces (universal:2 image), `grafana/otel-lgtm:latest` with Grafana 13.2.3 — **PASS** (traces, logs, metrics HTTP 200; 7 spans; 1 log record; exemplar → trace). Pin that image version for the session.
 

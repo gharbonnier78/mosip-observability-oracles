@@ -1,0 +1,198 @@
+================ tests ================
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 11.638s
+
+OK
+== containers
+oaef-lgtm Up 2 minutes (unhealthy) grafana/otel-lgtm:latest
+== grafana health: {"database":"ok","version":"13.2.3","commit":"90ffed056f0884267356c12a0eeb72a022af53f1"}
+== replay
+traces   HTTP 200
+logs     HTTP 200
+metrics  HTTP 200
+replayed trace id: 3571aaf11efe1a6374c293844fecff06
+packet-receiver span id: 3e24842cde3d556c
+== waiting 30 s for ingestion
+== datasources
+loki loki Loki
+prometheus prometheus Prometheus
+pyroscope grafana-pyroscope-datasource Pyroscope
+tempo tempo Tempo
+== trace 3571aaf11efe1a6374c293844fecff06
+["NIN-001 New adult registration no hit","step: Jarvis uploads \"10001100010000120261018102233.zip\" with \"POST /registrationprocessor/v1/packetreceiver/registrationpackets\"","POST","POST /registrationprocessor/v1/packetreceiver/registrationpackets","INSERT mosip_regprc.registration","packet-receiver-bus-out publish","packet-receiver-bus-out process"]
+== logs (regproc-pkr, last hour)
+["SESSIONID - REGISTRATIONID - 10001100010000120261018102233 - PacketReceiverServiceImpl::storePacket()::exit"]
+== metric series
+[{"n":"http_server_request_duration_seconds_bucket","job":"mosip/regproc-pkr","service_name":"regproc-pkr"},{"n":"http_server_request_duration_seconds_count","job":"mosip/regproc-pkr","service_name":"regproc-pkr"},{"n":"http_server_request_duration_seconds_sum","job":"mosip/regproc-pkr","service_name":"regproc-pkr"}]
+== exemplars
+[{"span_id":"3e24842cde3d556c","trace_id":"3571aaf11efe1a6374c293844fecff06"}]
+== summary
+spans in trace      : 7 (expected 7)
+pkr log records     : 1 (expected >= 1)
+exemplar -> trace   : 1 (expected >= 1)
+RESULT: PASS
+
+================ nominal ================
+run id: s1-c7d324d7093e | example trace id: 9de64784e26e1a8885964446b8b32344
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+PASS: 100 tx; expected events 300; observed 300; failed checks 0
+  run_id    : s1-c7d324d7093e   (fault: none, transactions: 100)
+  TX-017 trace: 932820d24bbfa58f39f39358eb13c09a
+  Tempo     : trace id 932820d24bbfa58f39f39358eb13c09a
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-c7d324d7093e" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-c7d324d7093e"}
+PASS: 100 tx; expected events 300; observed 300; failed checks 0
+BACKEND PASS | traces 100 / 100 | structured events 300 / 300 | metrics Counter({'PASS': 12}) | attempts 1
+Evidence: /tmp/oaef-v5/nominal | local integrity: True
+BUNDLE INTEGRITY: PASS
+PASS: 100 tx; expected events 300; observed 300; failed checks 0
+OFFLINE RE-EVALUATION: MATCH | original PASS | recalculated PASS
+  evidence  : /tmp/oaef-v5/nominal  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ duplicate ================
+run id: s1-cce90f040257 | example trace id: dfd4f7e88f87ae000b026555a859406e
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+FAIL: 100 tx; expected events 300; observed 301; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 301
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 2
+  run_id    : s1-cce90f040257   (fault: duplicate, transactions: 100)
+  TX-017 trace: 994a3da05773203afefb2d301af1117a
+  Tempo     : trace id 994a3da05773203afefb2d301af1117a
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-cce90f040257" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-cce90f040257"}
+FAIL: 100 tx; expected events 300; observed 301; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 301
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 2
+BACKEND FAIL | traces 100 / 100 | structured events 301 / 300 | metrics Counter({'PASS': 12}) | attempts 1
+Evidence: /tmp/oaef-v5/duplicate | local integrity: True
+BUNDLE INTEGRITY: PASS
+FAIL: 100 tx; expected events 300; observed 301; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 301
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 2
+OFFLINE RE-EVALUATION: MATCH | original FAIL | recalculated FAIL
+  evidence  : /tmp/oaef-v5/duplicate  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ missing ================
+run id: s1-f5afb8df1f9e | example trace id: 0de05e52c17370c3e4078346bec68ab6
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+FAIL: 100 tx; expected events 300; observed 299; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 299
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 0
+  run_id    : s1-f5afb8df1f9e   (fault: missing, transactions: 100)
+  TX-017 trace: dc2bbaeb20101dc3f58d3ba0a59a0661
+  Tempo     : trace id dc2bbaeb20101dc3f58d3ba0a59a0661
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-f5afb8df1f9e" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-f5afb8df1f9e"}
+FAIL: 100 tx; expected events 300; observed 299; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 299
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 0
+BACKEND INCONCLUSIVE | traces 100 / 100 | structured events 299 / 300 | metrics Counter({'PASS': 12}) | attempts 23
+Evidence: /tmp/oaef-v5/missing | local integrity: True
+BUNDLE INTEGRITY: PASS
+FAIL: 100 tx; expected events 300; observed 299; failed checks 2
+   RUN-EVENT-COUNT None expected 300 actual 299
+   EVENT-EXACT-mosip.identity.uin.assigned TX-017 expected 1 actual 0
+OFFLINE RE-EVALUATION: MATCH | original INCONCLUSIVE | recalculated INCONCLUSIVE
+  evidence  : /tmp/oaef-v5/missing  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ slow ================
+run id: s1-cabd7956727d | example trace id: 94e7e0b77a275fe32eb2435f055e3bce
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   NFR-DEMO-LATENCY TX-017 expected True actual False
+  run_id    : s1-cabd7956727d   (fault: slow, transactions: 100)
+  TX-017 trace: 6300a0344376c80a0b7f0a442af7599e
+  Tempo     : trace id 6300a0344376c80a0b7f0a442af7599e
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-cabd7956727d" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-cabd7956727d"}
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   NFR-DEMO-LATENCY TX-017 expected True actual False
+BACKEND FAIL | traces 100 / 100 | structured events 300 / 300 | metrics Counter({'PASS': 12}) | attempts 1
+Evidence: /tmp/oaef-v5/slow | local integrity: True
+BUNDLE INTEGRITY: PASS
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   NFR-DEMO-LATENCY TX-017 expected True actual False
+OFFLINE RE-EVALUATION: MATCH | original FAIL | recalculated FAIL
+  evidence  : /tmp/oaef-v5/slow  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ wrong_value ================
+run id: s1-4a24ee356e5b | example trace id: 5c6fc4c9cd260265aeaf14f0c0c84ea2
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   EVENT-EFFECT-VALUE TX-017 expected SYN-20261107-000017 actual CORRUPTED
+  run_id    : s1-4a24ee356e5b   (fault: wrong_value, transactions: 100)
+  TX-017 trace: 5feacd32067a8cd5dfd2f1a4b13e92f5
+  Tempo     : trace id 5feacd32067a8cd5dfd2f1a4b13e92f5
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-4a24ee356e5b" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-4a24ee356e5b"}
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   EVENT-EFFECT-VALUE TX-017 expected SYN-20261107-000017 actual CORRUPTED
+BACKEND FAIL | traces 100 / 100 | structured events 300 / 300 | metrics Counter({'PASS': 12}) | attempts 2
+Evidence: /tmp/oaef-v5/wrong_value | local integrity: True
+BUNDLE INTEGRITY: PASS
+FAIL: 100 tx; expected events 300; observed 300; failed checks 1
+   EVENT-EFFECT-VALUE TX-017 expected SYN-20261107-000017 actual CORRUPTED
+OFFLINE RE-EVALUATION: MATCH | original FAIL | recalculated FAIL
+  evidence  : /tmp/oaef-v5/wrong_value  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ metric_count ================
+run id: s1-8e5f4be58014 | example trace id: 86e02acb9c5964cc73cc4e1c59a01666
+OTLP traces 200
+OTLP logs 200
+OTLP metrics 200
+FAIL: 100 tx; expected events 300; observed 300; failed checks 3
+   METRIC-COUNT None expected 100 actual 101
+   METRIC-BUCKET-TOTAL None expected 100 actual 101
+   METRIC-SUM None expected 12.649 actual 12.769
+  run_id    : s1-8e5f4be58014   (fault: metric_count, transactions: 100)
+  TX-017 trace: 02b6560716e76fc5757704acbaee09a0
+  Tempo     : trace id 02b6560716e76fc5757704acbaee09a0
+  Loki      : {service_name="oaef-s1-simulator"} |= "s1-8e5f4be58014" | json | transaction_id="TX-017"
+  Prometheus: {__name__=~"oaef_synthetic_journey_duration.*",oaef_run_id="s1-8e5f4be58014"}
+PASS: 100 tx; expected events 300; observed 300; failed checks 0
+BACKEND FAIL | traces 100 / 100 | structured events 300 / 300 | metrics Counter({'FAIL': 9, 'PASS': 3}) | attempts 1
+Evidence: /tmp/oaef-v5/metric_count | local integrity: True
+BUNDLE INTEGRITY: PASS
+PASS: 100 tx; expected events 300; observed 300; failed checks 0
+OFFLINE RE-EVALUATION: MATCH | original FAIL | recalculated FAIL
+  evidence  : /tmp/oaef-v5/metric_count  (backend-verdict.json, backend-report.md, evidence-sha256.json)
+
+================ summary ================
+ok          unit and mutation tests (offline, fake backend) (exit 0)
+ok          S0 legacy 7-span smoke (connectivity only) (exit 0)
+ok          nominal: S1 generate + export + emitted-payload oracle (exit 0)
+ok          nominal: S2-read collect from Tempo/Loki/Prometheus (exit 0)
+ok          nominal: evidence bundle integrity (exit 0)
+ok          nominal: offline re-evaluation reproduces verdict (exit 0)
+ok          duplicate: S1 generate + export + emitted-payload oracle (exit 1)
+ok          duplicate: S2-read collect from Tempo/Loki/Prometheus (exit 1)
+ok          duplicate: evidence bundle integrity (exit 0)
+ok          duplicate: offline re-evaluation reproduces verdict (exit 0)
+ok          missing: S1 generate + export + emitted-payload oracle (exit 1)
+ok          missing: S2-read collect from Tempo/Loki/Prometheus (exit 2)
+ok          missing: evidence bundle integrity (exit 0)
+ok          missing: offline re-evaluation reproduces verdict (exit 0)
+ok          slow: S1 generate + export + emitted-payload oracle (exit 1)
+ok          slow: S2-read collect from Tempo/Loki/Prometheus (exit 1)
+ok          slow: evidence bundle integrity (exit 0)
+ok          slow: offline re-evaluation reproduces verdict (exit 0)
+ok          wrong_value: S1 generate + export + emitted-payload oracle (exit 1)
+ok          wrong_value: S2-read collect from Tempo/Loki/Prometheus (exit 1)
+ok          wrong_value: evidence bundle integrity (exit 0)
+ok          wrong_value: offline re-evaluation reproduces verdict (exit 0)
+ok          metric_count: S1 generate + export + emitted-payload oracle (exit 1)
+ok          metric_count: S2-read collect from Tempo/Loki/Prometheus (exit 1)
+ok          metric_count: evidence bundle integrity (exit 0)
+ok          metric_count: offline re-evaluation reproduces verdict (exit 0)
+DEMO RESULT: every case behaved as expected

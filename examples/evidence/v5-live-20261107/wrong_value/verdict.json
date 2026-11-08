@@ -1,0 +1,19 @@
+{
+  "backend_ingestion_verified": false,
+  "count_expected_events": 300,
+  "count_expected_transactions": 100,
+  "count_observed_events": 300,
+  "failures": [
+    {
+      "actual": "CORRUPTED",
+      "check_id": "EVENT-EFFECT-VALUE",
+      "expected": "SYN-20261107-000017",
+      "status": "FAIL",
+      "transaction_id": "TX-017"
+    }
+  ],
+  "mode": "S1",
+  "run_id": "s1-4a24ee356e5b",
+  "source": "stored synthetic emitted payload only",
+  "status": "FAIL"
+}

@@ -1,0 +1,12 @@
+# OAEF demo: adds the reusable OAEF dashboards (observability/dashboards/*.json) in a folder "OAEF",
+# next to the image's own dashboards. Mounted by validation/demo/docker-compose.yml.
+apiVersion: 1
+
+providers:
+  - name: "OAEF"
+    folder: "OAEF"
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /otel-lgtm/oaef-dashboards
+      foldersFromFilesStructure: false

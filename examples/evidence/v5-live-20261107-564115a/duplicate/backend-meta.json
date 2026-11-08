@@ -1,0 +1,67 @@
+{
+  "attempts": 1,
+  "backend_errors": {},
+  "collect_seconds": 19.19,
+  "collect_started_ns": "1794073404906363757",
+  "collection_log": [
+    {
+      "attempt": 1,
+      "complete": true,
+      "loki": {
+        "error": null,
+        "lines": 301,
+        "ms": 44,
+        "parsed": 301
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 4
+      },
+      "t_s": 0.0,
+      "tempo": {
+        "error": null,
+        "ms": 892,
+        "requests": 100,
+        "returned": 100
+      }
+    }
+  ],
+  "loki_limit": 2500,
+  "loki_selector": "{service_name=~\"idrepo-identity|regproc-pkr\"}",
+  "loki_truncated_possible": false,
+  "metric_series": 10,
+  "parse_errors": [],
+  "parsed_log_records": 301,
+  "poll_s": 3.0,
+  "queried_base": "http://localhost:3000",
+  "queried_log_records": 301,
+  "queried_trace_count": 100,
+  "queries": {
+    "loki": {
+      "direction": "forward",
+      "end_ns": "1794073461694673280",
+      "limit": 2500,
+      "query": "{service_name=~\"idrepo-identity|regproc-pkr\"} |= \"s1-a6438d48eddf\"",
+      "start_ns": "1794073386506673280"
+    },
+    "prometheus": "{__name__=~\"oaef_synthetic_journey_duration.*\",oaef_run_id=\"s1-a6438d48eddf\"} (instant)",
+    "tempo": "GET /api/traces/{trace_id} for each emitted trace id"
+  },
+  "query_end_ns": "1794073461694673280",
+  "query_start_ns": "1794073386506673280",
+  "returned_trace_count": 100,
+  "scope": "synthetic S1 observation only; no actual MOSIP SUT",
+  "source": "Grafana proxy Tempo/Loki/Prometheus API",
+  "timeout_s": 90.0,
+  "uids": {
+    "loki": "loki",
+    "prometheus": "prometheus",
+    "tempo": "tempo"
+  },
+  "verifier_code_sha256": {
+    "v5_backend.py": "43c6f47540e39de36593cfc22785e2f92a58c7c2cb9e0634cd0058563293856d",
+    "v5_demo.py": "f29ddfad4655494183927c151efb8aec98709881d87a65f6a4d230f57f5f8566"
+  }
+}

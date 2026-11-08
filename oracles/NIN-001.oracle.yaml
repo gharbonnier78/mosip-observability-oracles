@@ -1,4 +1,6 @@
 # Oracle for NIN-001 — deterministic, machine-checkable expectations.
+# Traceability: `requirements:` on an element lists the requirements it verifies (models/nin-requirements.md);
+# cross-cutting requirements (scenarios "all", e.g. NF-07, NF-08) are added by the compiler.
 # Matcher DSL: see README.md#oracle-dsl. Key points:
 #   literal          -> exact equality (typed: int vs string matters, OTLP int64 arrive as JSON strings and are normalised)
 #   {$re: ...}       -> full-match regex          {$cap: x} -> capture value into variable x
@@ -116,11 +118,13 @@ traces:
     T3: { locate_by: "span link to the WebSub publisher span (WP0-SW-04); fallback: log correlation on credential id", note: "WebSub delivery starts a NEW trace" }
   links:                              # WP0-SW-04: asynchronous breaks are joined by span links, not by heuristics
     - alias: LINK_CREDENTIAL_BATCH
+      requirements: [F-08]
       trace: T2
       span: { kind: {$in: [1, 5]}, parentSpanId: "" }    # first span of the batch job trace
       link_to: IDREPO_CREATE_SERVER                       # links[].traceId == trace.root and links[].spanId == IDREPO_CREATE_SERVER.spanId
       attributes: { mosip.rid: {$ref: rid}, test.case.name: "NIN-001" }   # restored from the stored context (no baggage after the break)
     - alias: LINK_WEBSUB_DELIVERY
+      requirements: [F-08]
       trace: T3
       span: { kind: 2, parentSpanId: "" }                 # ida-internal callback server span
       link_to_trace: T2                                   # publisher span of the CREDENTIAL_ISSUED event
@@ -143,6 +147,7 @@ traces:
     every_child_span: "parentSpanId refers to a span of the same trace; child start >= parent start (clock skew tolerance 50 ms)"
   spans:
     - alias: ROOT
+      requirements: [F-01, F-03]
       trace: T1
       resource: { service.name: "jarvis-e2e" }
       scope: { name: "jarvis" }
@@ -161,6 +166,8 @@ traces:
       capture: { traceId: trace.root, spanId: span.root }
 
     - alias: STEP_UPLOAD
+
+      requirements: [F-03, F-04]
       trace: T1
       resource: { service.name: "jarvis-e2e" }
       name: {$re: "^step: Jarvis uploads .*registrationpackets.*$"}
@@ -168,6 +175,8 @@ traces:
       parent: ROOT
 
     - alias: JARVIS_UPLOAD_CLIENT
+
+      requirements: [F-04]
       trace: T1
       resource: { service.name: "jarvis-e2e" }
       name: "POST"                                       # HTTP client span name = method (no url.template)
@@ -181,6 +190,8 @@ traces:
       status: { code: 0 }
 
     - alias: PKR_SERVER
+
+      requirements: [F-04]
       trace: T1
       resource: { service.name: "regproc-pkr" }
       name: {$re: "^POST (/registrationprocessor/v1/packetreceiver)?/registrationpackets$"}   # "{method} {http.route}", context path inclusion is version-dependent
@@ -198,6 +209,8 @@ traces:
       duration_ms: {$lte: 5000}
 
     - alias: PKR_DB_INSERT_REGISTRATION
+
+      requirements: [F-04]
       trace: T1
       resource: { service.name: "regproc-pkr" }
       name: {$re: "^INSERT .*registration$"}
@@ -211,6 +224,8 @@ traces:
       count: {$gte: 1}
 
     - alias: PKR_AUDIT_CLIENT
+
+      requirements: [F-10]
       trace: T1
       resource: { service.name: "regproc-pkr" }
       name: "POST"
@@ -221,6 +236,7 @@ traces:
         url.full: {$re: "^https?://[^/]+/v1/auditmanager/audits$"}
         http.response.status_code: 200
     - alias: AUDIT_SERVER
+      requirements: [F-10]
       trace: T1
       resource: { service.name: "auditmanager" }
       name: {$re: "^POST (/v1/auditmanager)?/audits$"}
@@ -228,6 +244,7 @@ traces:
       parent: PKR_AUDIT_CLIENT
       attributes: { http.response.status_code: 200 }
     - alias: AUDIT_DB_INSERT
+      requirements: [F-10]
       trace: T1
       resource: { service.name: "auditmanager" }
       name: {$re: "^INSERT .*app_audit_log$"}
@@ -236,6 +253,8 @@ traces:
       attributes: { db.system.name: "postgresql", db.namespace: "mosip_audit", db.operation.name: "INSERT", db.collection.name: "app_audit_log" }
 
     - alias: PKR_KAFKA_PUBLISH
+
+      requirements: [F-04]
       trace: T1
       resource: { service.name: "regproc-pkr" }
       name: {$re: "^.+ publish$"}                        # agent 2.x messaging naming "{destination} publish"
@@ -247,6 +266,8 @@ traces:
         messaging.destination.name: {$cap: topic.pkr_out}
 
     - alias: UPLOADER_PROCESS
+
+      requirements: [F-04]
       trace: T1
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       name: {$re: "^.+ process$"}
@@ -259,6 +280,7 @@ traces:
         messaging.kafka.consumer.group: {$exists: true}
         mosip.rid: {$ref: rid}
     - alias: UPLOADER_DECRYPT
+      requirements: [F-04]
       trace: T1
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       name: "POST"
@@ -266,6 +288,7 @@ traces:
       parent_ancestor: UPLOADER_PROCESS
       attributes: { url.full: {$re: "^https?://[^/]+/v1/keymanager/decrypt$"}, http.response.status_code: 200 }
     - alias: UPLOADER_S3_PUT
+      requirements: [F-04]
       trace: T1
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       name: "S3.PutObject"                               # AWS SDK instrumentation, object store adapter (MinIO)
@@ -274,6 +297,8 @@ traces:
       attributes: { rpc.system: "aws-api", rpc.service: "S3", rpc.method: "PutObject" }
 
     - alias: STAGE_PROCESS
+
+      requirements: [F-04, F-05]
       trace: T1
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       name: {$re: "^.+ process$"}
@@ -284,6 +309,8 @@ traces:
       status: { code: 0 }
 
     - alias: UINGEN_GET_UIN_CLIENT
+
+      requirements: [F-07]
       trace: T1
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       name: "GET"
@@ -291,18 +318,21 @@ traces:
       parent_kind_ancestor: 5
       attributes: { url.full: {$re: "^https?://[^/]+/v1/idgenerator/uin$"}, http.response.status_code: 200 }
     - alias: IDGEN_GET_SERVER
+      requirements: [F-07]
       trace: T1
       resource: { service.name: "idgenerator" }
       name: {$re: "^GET (/v1/idgenerator)?/uin$"}
       kind: 2
       parent: UINGEN_GET_UIN_CLIENT
     - alias: IDGEN_PUT_SERVER                            # UIN status ISSUED -> ASSIGNED after idrepo success
+      requirements: [F-07]
       trace: T1
       resource: { service.name: "idgenerator" }
       name: {$re: "^PUT (/v1/idgenerator)?/uin$"}
       kind: 2
       after: IDREPO_CREATE_SERVER
     - alias: IDREPO_CREATE_SERVER
+      requirements: [F-07, F-08]
       trace: T1
       resource: { service.name: "idrepo-identity" }
       name: {$re: "^POST (/idrepository/v1/identity)?/?$"}
@@ -311,6 +341,7 @@ traces:
       after: IDGEN_GET_SERVER
       attributes: { http.response.status_code: 200 }
     - alias: IDREPO_ENCRYPT_CLIENT
+      requirements: [F-08]
       trace: T1
       resource: { service.name: "idrepo-identity" }
       name: "POST"
@@ -319,6 +350,7 @@ traces:
       attributes: { url.full: {$re: "^https?://[^/]+/v1/keymanager/encrypt$"} }
       count: {$gte: 1}
     - alias: IDREPO_DB_INSERT_UIN
+      requirements: [F-07, F-08]
       trace: T1
       resource: { service.name: "idrepo-identity" }
       name: {$re: "^INSERT .*uin$"}
@@ -327,6 +359,8 @@ traces:
       attributes: { db.system.name: "postgresql", db.namespace: "mosip_idrepo", db.collection.name: "uin" }
 
     - alias: JARVIS_STATUS_POLL
+
+      requirements: [NF-04]
       trace: T1
       resource: { service.name: "jarvis-e2e" }
       name: "POST"
@@ -355,6 +389,7 @@ logs:
     resource: { service.name: {$exists: true}, k8s.pod.name: {$exists: true}, deployment.environment.name: {$ref: env.name}, cloud.region: {$ref: env.site}, k8s.cluster.name: {$ref: env.cluster} }
   expected:
     - alias: LOG_PKR_RECEIVED
+      requirements: [F-04]
       resource: { service.name: "regproc-pkr" }
       severityNumber: 9
       severityText: "INFO"
@@ -363,12 +398,14 @@ logs:
       spanId: {$span_of: [PKR_SERVER], $descendant_ok: true}    # log spanId = PKR_SERVER or one of its descendants
       count: {$gte: 1}
     - alias: LOG_STAGE_SUCCESS
+      requirements: [F-04, F-05]
       resource: { service.name: {$re: "^regproc-group[1-7]$"} }
       severityNumber: 9
       body: {$re: "(?s).*${rid}.*"}
       traceId: {$ref: trace.root}
       count: {$gte: 8}
     - alias: LOG_IDREPO_CREATED
+      requirements: [F-08]
       resource: { service.name: "idrepo-identity" }
       severityNumber: 9
       traceId: {$ref: trace.root}
@@ -394,12 +431,12 @@ events:
     severityNumber: 9
     forbidden_attribute_values: ["${uin}", "${vid}", "${resident.phone}", "${resident.email}"]
   expected_ordered_subsequence:
-    - { alias: EV_PACKET_RECEIVED, eventName: "mosip.registration.packet.received", trace: T1, span_of: PKR_SERVER, attributes: { mosip.rid: {$ref: rid}, mosip.reg_type: "NEW" } }
-    - { alias: EV_STAGE_COMPLETED, eventName: "mosip.registration.stage.completed", trace: T1, attributes: { mosip.rid: {$ref: rid}, mosip.stage: {$exists: true}, mosip.stage.status: "SUCCESS" }, count: {$gte: 8} }
-    - { alias: EV_UIN_ASSIGNED, eventName: "mosip.identity.uin.assigned", trace: T1, attributes: { mosip.rid: {$ref: rid} } }   # never the UIN itself
-    - { alias: EV_IDENTITY_ACTIVATED, eventName: "mosip.identity.activated", trace: T1, span_of: IDREPO_CREATE_SERVER, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
-    - { alias: EV_CREDENTIAL_ISSUED, eventName: "mosip.credential.issued", trace: T2, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
-    - { alias: EV_NOTIFICATION_SENT, eventName: "mosip.notification.sent", attributes: { mosip.rid: {$ref: rid}, mosip.notification.channel: {$in: [email, sms]} }, count: {$gte: 1} }
+    - { alias: EV_PACKET_RECEIVED, requirements: [F-04], eventName: "mosip.registration.packet.received", trace: T1, span_of: PKR_SERVER, attributes: { mosip.rid: {$ref: rid}, mosip.reg_type: "NEW" } }
+    - { alias: EV_STAGE_COMPLETED, requirements: [F-04, F-05], eventName: "mosip.registration.stage.completed", trace: T1, attributes: { mosip.rid: {$ref: rid}, mosip.stage: {$exists: true}, mosip.stage.status: "SUCCESS" }, count: {$gte: 8} }
+    - { alias: EV_UIN_ASSIGNED, requirements: [F-07], eventName: "mosip.identity.uin.assigned", trace: T1, attributes: { mosip.rid: {$ref: rid} } }   # never the UIN itself
+    - { alias: EV_IDENTITY_ACTIVATED, requirements: [F-08], eventName: "mosip.identity.activated", trace: T1, span_of: IDREPO_CREATE_SERVER, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
+    - { alias: EV_CREDENTIAL_ISSUED, requirements: [F-08], eventName: "mosip.credential.issued", trace: T2, attributes: { mosip.uin_hash: {$ref: uin_hash} } }
+    - { alias: EV_NOTIFICATION_SENT, requirements: [F-09], eventName: "mosip.notification.sent", attributes: { mosip.rid: {$ref: rid}, mosip.notification.channel: {$in: [email, sms]} }, count: {$gte: 1} }
   stage_sequence: "mosip.stage values of EV_STAGE_COMPLETED == db.regprc_transactions.ordered_subsequence minus PACKET_RECEIVER"
   durations:                          # business KPIs from event timestamps, across traces T1..T3
     - { id: NF-04, from: EV_PACKET_RECEIVED, to: EV_IDENTITY_ACTIVATED, expect_s: {$lte: 86400} }   # [24] h [A]
@@ -447,6 +484,21 @@ metrics:
     aggregationTemporality: 2         # CUMULATIVE
     explicitBounds: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]
     dataPoint_attributes: [http.request.method, http.route, http.response.status_code, url.scheme, network.protocol.version]
+  run_isolated:                       # S1 demonstrator: one-sample-per-run series, isolated by the oaef_run_id label (demo only, not a production practice)
+    journey_histogram:                # upload -> UIN assignment, one measurement per transaction, exact count reconciled with the run
+      name: "oaef.synthetic.journey.duration"
+      unit: "s"
+      from: EV_PACKET_RECEIVED
+      to: EV_UIN_ASSIGNED
+      explicitBounds: [0.1, 0.25, 0.5, 1, 2, 5, 10]
+      requirements: [NF-08]
+    service_metrics:                  # http.server.request.duration (otlp_shape above) of the run, per server span alias
+      - { alias: PKR_SERVER, per_transaction: 1, requirements: [F-04, NF-08] }
+      - { alias: IDGEN_GET_SERVER, per_transaction: 1, requirements: [F-07, NF-08] }
+      - { alias: IDGEN_PUT_SERVER, per_transaction: 1, requirements: [F-07, NF-08] }
+      - { alias: IDREPO_CREATE_SERVER, per_transaction: 1, requirements: [F-08, NF-08] }
+      - { alias: AUDIT_SERVER, per_transaction: 1, requirements: [F-10, NF-08] }
+    reconcile: "count == transactions x per_transaction; sum == sum of the durations of the alias's spans retrieved from Tempo"
 
 # ---------------------------------------------------------------------------
 # 5. AUDIT — MOSIP audit (kernel-auditmanager, table mosip_audit.app_audit_log) + Loki tenant "audit"
@@ -508,3 +560,45 @@ verdict:
     SILENT_FAILURE: "functional KO and no ERROR span/log for the failing step"
     TEST_DATA_CONFIG: "functional KO with business rejection code mapped to masterdata/partner config"
     PRODUCT_BUG: "functional KO with ERROR span + exception event in a MOSIP service, infra clean"
+
+# ---------------------------------------------------------------------------
+# 8. SCENARIO STEPS — the Gherkin steps of features/nin_001_new_adult_no_hit.feature, with the span aliases,
+#    event names and checks that decide each step (used by reports, Allure and the Xray export).
+# ---------------------------------------------------------------------------
+scenario_steps:
+  - id: STEP-1
+    text: 'When Jarvis uploads "${rid}.zip" with "POST /registrationprocessor/v1/packetreceiver/registrationpackets"'
+    expected: "HTTP 200 from the packet receiver; packet stored and audited; one mosip.registration.packet.received event"
+    requirements: [F-03, F-04, F-10]
+    spans: [ROOT, STEP_UPLOAD, JARVIS_UPLOAD_CLIENT, PKR_SERVER, PKR_DB_INSERT_REGISTRATION, PKR_AUDIT_CLIENT, AUDIT_SERVER, AUDIT_DB_INSERT, PKR_KAFKA_PUBLISH]
+    events: [mosip.registration.packet.received]
+  - id: STEP-2
+    text: "Then the packet goes through the processing stages (upload, validation, classification, CMD and operator validation, demographic and biometric dedupe NO_HIT)"
+    expected: "uploader decrypts and stores the packet; at least 8 stage hops producer -> consumer; one stage.completed event per stage"
+    requirements: [F-04, F-05]
+    spans: [UPLOADER_PROCESS, UPLOADER_DECRYPT, UPLOADER_S3_PUT, STAGE_PROCESS]
+    events: [mosip.registration.stage.completed]
+  - id: STEP-3
+    text: "And exactly one UIN is generated and the identity is created and activated"
+    expected: "one UIN from idgenerator, identity created (<= 3000 ms) and activated with the UIN hash; UIN marked assigned"
+    requirements: [F-07, F-08]
+    spans: [UINGEN_GET_UIN_CLIENT, IDGEN_GET_SERVER, IDREPO_CREATE_SERVER, IDREPO_ENCRYPT_CLIENT, IDREPO_DB_INSERT_UIN, IDGEN_PUT_SERVER]
+    events: [mosip.identity.uin.assigned, mosip.identity.activated]
+  - id: STEP-4
+    text: "And the credential is issued to the verification partners"
+    expected: "credential batch trace linked to the identity creation; WebSub delivery linked to it; one credential.issued event"
+    requirements: [F-08]
+    spans: [LINK_CREDENTIAL_BATCH, LINK_WEBSUB_DELIVERY]
+    events: [mosip.credential.issued]
+  - id: STEP-5
+    text: "And the resident is notified by email or SMS"
+    expected: "mosip.notification.sent within 15 minutes of activation (NF-05)"
+    requirements: [F-09, NF-05]
+    events: [mosip.notification.sent]
+    checks: [OBL-EVENTS-NF-05]
+  - id: STEP-6
+    text: 'And Jarvis observes the external status "PROCESSED" within the window'
+    expected: "status polled 1 to 60 times; upload to activation within 24 h (NF-04)"
+    requirements: [NF-04]
+    spans: [JARVIS_STATUS_POLL]
+    checks: [OBL-EVENTS-NF-04]

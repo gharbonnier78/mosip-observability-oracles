@@ -1,0 +1,88 @@
+# OAEF demo: Grafana data sources for grafana/otel-lgtm, replacing the image's own file
+# (/otel-lgtm/grafana/conf/provisioning/datasources/grafana-datasources.yaml; same uids, so scripts are unchanged).
+# Base: docker-otel-lgtm docker/grafana-datasources.yaml. Additions are marked OAEF.
+# "$$" escapes a Grafana variable; "$OAEF_..." is replaced from the container environment at startup.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    url: http://127.0.0.1:9090
+    editable: true
+    jsonData:
+      timeInterval: 60s
+      # metric -> trace: exemplar trace_id opens the trace in Tempo
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+          urlDisplayLabel: "Trace: $${__value.raw}"
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://127.0.0.1:3200
+    editable: true
+    jsonData:
+      # span -> logs of the same trace and service
+      tracesToLogsV2:
+        customQuery: true
+        datasourceUid: "loki"
+        query: '{$${__tags}} | trace_id = "$${__trace.traceId}"'
+        tags:
+          - key: "service.name"
+            value: "service_name"
+      # OAEF: span -> metrics of the same run (journey histogram with exemplars) and HTTP latency of the service
+      tracesToMetrics:
+        datasourceUid: "prometheus"
+        spanStartTimeShift: "-10m"
+        spanEndTimeShift: "10m"
+        tags:
+          - key: "oaef.run.id"
+            value: "oaef_run_id"
+        queries:
+          - name: "Journey duration of this run (exemplars on)"
+            query: 'sum by (le) (oaef_synthetic_journey_duration_seconds_bucket{$$__tags})'
+          - name: "Request duration per service of this run (exemplars on)"
+            query: 'sum by (service_name, le) (http_server_request_duration_seconds_bucket{$$__tags})'
+      serviceMap:
+        datasourceUid: "prometheus"
+      search:
+        hide: false
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: "loki"
+
+  - name: Loki
+    type: loki
+    uid: loki
+    url: http://127.0.0.1:3100
+    editable: true
+    jsonData:
+      derivedFields:
+        # log -> trace
+        - name: "trace_id"
+          matcherType: "label"
+          matcherRegex: "trace_id"
+          url: "$${__value.raw}"
+          datasourceUid: "tempo"
+          urlDisplayLabel: "Trace: $${__value.raw}"
+        # OAEF: log -> test report of the run, in another application (the evidence report server)
+        - name: "oaef_run_id"
+          matcherType: "label"
+          matcherRegex: "oaef_run_id"
+          url: "$OAEF_REPORT_BASE_URL/runs/$${__value.raw}/report.html"
+          urlDisplayLabel: "OAEF test report: $${__value.raw}"
+        # OAEF, S2 template (not used by the synthetic demo): log -> the SUT's own UI for the same business key,
+        # e.g. the MOSIP admin portal packet status for a RID. Requires mosip.rid as a log attribute.
+        # - name: "mosip_rid"
+        #   matcherType: "label"
+        #   matcherRegex: "mosip_rid"
+        #   url: "$OAEF_SUT_ADMIN_URL/packet-status/$${__value.raw}"
+        #   urlDisplayLabel: "MOSIP admin: packet $${__value.raw}"
+
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    uid: pyroscope
+    url: http://127.0.0.1:4040

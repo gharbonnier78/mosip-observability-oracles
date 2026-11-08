@@ -1,0 +1,12 @@
+{
+  "contract_sha256": "de9bf1bf9d4b9364d6ada7783b3f738e343f24128a74522b80bcb248ee11f5d8",
+  "contract_snapshot_sha256": "e68e2589e276ae38e924c23ca14f029f8b568ca779f3714cf01f4d8f4db341b2",
+  "fault": "missing",
+  "mode": "S1",
+  "otlp_status": "attempted",
+  "run_id": "s1-f5afb8df1f9e",
+  "scope": "S1 simulated 3-milestone vertical slice, NOT full MOSIP NIN-001 conformance",
+  "seed": 20261107,
+  "target": 17,
+  "transactions": 100
+}

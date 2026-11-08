@@ -1,0 +1,93 @@
+{
+  "backend_ingestion_verified": false,
+  "backend_query_provenance": "backend-meta.json",
+  "business_sut_verified": false,
+  "classification": "METRIC_RECONCILIATION_FAILURE",
+  "collected_artifact": "collected-otel.json",
+  "diagnostic_classes": [
+    "METRIC_RECONCILIATION_FAILURE"
+  ],
+  "event_span_failures": [],
+  "events_collected": 300,
+  "events_expected": 300,
+  "evidence_sufficiency": "SUFFICIENT_FOR_S1",
+  "metric_checks": [
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-COUNT-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 1,
+      "check_id": "PROM-SERIES-SUM-UNIQUE",
+      "expected": 1,
+      "status": "PASS"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-MEASUREMENTS-COUNT",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 12.768999999999998,
+      "check_id": "PROM-MEASUREMENTS-SUM-S",
+      "expected": 12.649,
+      "status": "FAIL"
+    },
+    {
+      "actual": 26.0,
+      "check_id": "PROM-BUCKET-0.1",
+      "expected": 26,
+      "status": "PASS"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-0.25",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-0.5",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-1",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-2",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-5",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-10",
+      "expected": 100,
+      "status": "FAIL"
+    },
+    {
+      "actual": 101.0,
+      "check_id": "PROM-BUCKET-INF",
+      "expected": 100,
+      "status": "FAIL"
+    }
+  ],
+  "mode": "S1_BACKEND_OBSERVATION",
+  "run_id": "s1-c592df2df64a",
+  "status": "FAIL",
+  "trace_count": 100,
+  "transaction_count": 100
+}

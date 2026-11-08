@@ -1,0 +1,8 @@
+date_utc: 2026-11-07T16:33:25Z
+git_commit: ceec0cbdec99a16d1a090ad6760da0ac8a519df5
+lgtm_image: grafana/otel-lgtm:latest sha256:8d078e2af327da86c91cb907cde1e87c37e13708b8ec35672c99d8e76441e661
+lgtm_repo_digest: 
+grafana: {"database":"ok","version":"13.2.3","commit":"90ffed056f0884267356c12a0eeb72a022af53f1"}
+python: Python 3.12.1
+docker: 28.1.1-1
+host: 2 cpu, 7 GiB

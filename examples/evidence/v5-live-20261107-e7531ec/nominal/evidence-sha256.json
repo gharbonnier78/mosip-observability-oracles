@@ -1,0 +1,21 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "backend-meta.json": "81936333cec7a2c2bdda400cb3baeee713b4a5a2a15b18c080222bda51125ef5",
+    "backend-raw/loki.json": "c580640248fc3aea91cf35b067bce54821d7e71f79d97167965ebeee4ffcbd2f",
+    "backend-raw/prometheus.json": "7df4fba733775d8774457a2310179a02f2fdea7e9e233876672fff0c0483e1d9",
+    "backend-raw/tempo.json": "c939052739f057b1769b4c6fee1f4eff10696bcf76a94c9aa7185cf34585d3af",
+    "backend-report.md": "ae6de974f288ff4626abd02be5eb725ffd3609938fccb55cbad0d9cc9de5324b",
+    "backend-verdict.json": "ef73b7ab62507cc72b65035dc24d6f60d463eae26d78812d8a39e4f3e8b32433",
+    "collected-otel.json": "df48fb06e561a3b6a058f4e86abf0f92e181912d497da4221e482fbe6644bd80",
+    "collected-verdict.json": "f53b72970604998ed1bf9ecb51c2029e285f1832ddbdd5b2e5c325d1aa98d2ef",
+    "contract.json": "84a5a8e48660505e1706be660501182bc5b02f153d456ea58a2fddc6ee39b77d",
+    "ledger.json": "7840487b330dcc8d213746618c128f764986ea1be6668a6688cd27ca927f9b97",
+    "links.md": "869943343cf93dba898ea6cb149925cd4650d7d296772d5274b5e5809015aa16",
+    "manifest.json": "34f98eb8738c319130865a0e8c91231ba041f8c94753856e7594e58028986378",
+    "observed.json": "60407f9c0ba9e4653732c140a393e31f735d3b6c03e0ea5030b9651ec6a20703",
+    "report.html": "6a1ba69c2321c33debbecf67a1ec8aa4ae48e7719fe4c266475060ce05475637",
+    "verdict.json": "0097e3ff13a1a2cb09e8d57464cc802152a2c03b4b349d282e5fb543faddfe60"
+  },
+  "scope": "local integrity, NOT signature or WORM"
+}

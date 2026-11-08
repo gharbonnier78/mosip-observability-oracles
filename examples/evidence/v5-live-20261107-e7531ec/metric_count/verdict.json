@@ -1,0 +1,35 @@
+{
+  "backend_ingestion_verified": false,
+  "count_expected_events": 300,
+  "count_expected_spans": 1700,
+  "count_expected_transactions": 100,
+  "count_observed_events": 300,
+  "count_observed_spans": 1700,
+  "failures": [
+    {
+      "actual": 101,
+      "check_id": "METRIC-COUNT",
+      "expected": 100,
+      "status": "FAIL",
+      "transaction_id": null
+    },
+    {
+      "actual": 101,
+      "check_id": "METRIC-BUCKET-TOTAL",
+      "expected": 100,
+      "status": "FAIL",
+      "transaction_id": null
+    },
+    {
+      "actual": 12.769,
+      "check_id": "METRIC-SUM",
+      "expected": 12.649,
+      "status": "FAIL",
+      "transaction_id": null
+    }
+  ],
+  "mode": "S1",
+  "run_id": "s1-c592df2df64a",
+  "source": "stored synthetic emitted payload only",
+  "status": "FAIL"
+}

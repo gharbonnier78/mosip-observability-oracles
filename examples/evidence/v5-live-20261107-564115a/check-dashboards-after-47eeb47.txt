@@ -1,0 +1,17 @@
+== OAEF — Journey
+  SKIPPED  Service graph (Tempo, all runs in the time range) (service map is assembled by the browser)
+  OK       Transactions in this run: 1 frame(s), 1 row(s)
+  OK       Verdict of this run: 1 frame(s), 1 row(s)
+  OK       Requests per service (this run): 4 frame(s), 4 row(s)
+  OK       Mean server latency per service (this run): 4 frame(s), 4 row(s)
+  OK       Journey duration buckets of this run (exemplars open the trace): 9 frame(s), 41 row(s)
+  OK       RED from span metrics: request rate per service: 5 frame(s), 24 row(s)
+  OK       Traces of this run (click a trace id): 1 frame(s), 100 row(s)
+  OK       p95 latency per service (span metrics): 4 frame(s), 24 row(s)
+  OK       Business events of this run: 1 frame(s), 100 row(s)
+== OAEF — Test runs
+  OK       Runs by verdict: 3 frame(s), 3 row(s)
+  OK       Failures by diagnostic class: 4 frame(s), 4 row(s)
+  OK       Verdicts over time: 3 frame(s), 5 row(s)
+  OK       Runs (click run_id for its journey, report_url for its report): 1 frame(s), 9 row(s)
+DASHBOARDS: PASS

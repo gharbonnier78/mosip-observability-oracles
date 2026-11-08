@@ -1,0 +1,272 @@
+{
+  "schema": "oaef.synthetic.slice/v2",
+  "scenario": "NIN-001",
+  "scope": "S1 simulated NIN-001 journey (3 required business events, 17 expected spans over 6 services), NOT full MOSIP NIN-001 conformance",
+  "requirement_refs": [
+    "F-07",
+    "F-08",
+    "NF-04",
+    "NF-08"
+  ],
+  "model_refs": [
+    "models/nin-enrolment-activity.puml"
+  ],
+  "required_events": [
+    "mosip.registration.packet.received",
+    "mosip.identity.uin.assigned",
+    "mosip.identity.activated"
+  ],
+  "journey_spans": [
+    {
+      "id": "root",
+      "service": "jarvis-e2e",
+      "name": "NIN-001 New adult registration no hit",
+      "kind": 1,
+      "parent": null
+    },
+    {
+      "id": "upload",
+      "service": "jarvis-e2e",
+      "name": "POST /registrationprocessor/v1/packetreceiver/registrationpackets",
+      "kind": 3,
+      "parent": "root"
+    },
+    {
+      "id": "pkr",
+      "service": "regproc-pkr",
+      "name": "POST /registrationprocessor/v1/packetreceiver/registrationpackets",
+      "kind": 2,
+      "parent": "upload"
+    },
+    {
+      "id": "received",
+      "service": "regproc-pkr",
+      "name": "mosip.registration.packet.received",
+      "kind": 1,
+      "parent": "pkr"
+    },
+    {
+      "id": "publish",
+      "service": "regproc-pkr",
+      "name": "packet-receiver-bus-out publish",
+      "kind": 4,
+      "parent": "pkr"
+    },
+    {
+      "id": "process",
+      "service": "regproc-group1",
+      "name": "packet-receiver-bus-out process",
+      "kind": 5,
+      "parent": "publish"
+    },
+    {
+      "id": "validate",
+      "service": "regproc-group1",
+      "name": "packet validation",
+      "kind": 1,
+      "parent": "process"
+    },
+    {
+      "id": "dedupe",
+      "service": "regproc-group1",
+      "name": "bio-dedupe decision",
+      "kind": 1,
+      "parent": "process"
+    },
+    {
+      "id": "uin-client",
+      "service": "regproc-group1",
+      "name": "GET /v1/idgenerator/uin",
+      "kind": 3,
+      "parent": "process"
+    },
+    {
+      "id": "uin-server",
+      "service": "idgenerator",
+      "name": "GET /v1/idgenerator/uin",
+      "kind": 2,
+      "parent": "uin-client"
+    },
+    {
+      "id": "idrepo-client",
+      "service": "regproc-group1",
+      "name": "POST /idrepository/v1/identity/",
+      "kind": 3,
+      "parent": "process"
+    },
+    {
+      "id": "idrepo-server",
+      "service": "idrepo-identity",
+      "name": "POST /idrepository/v1/identity/",
+      "kind": 2,
+      "parent": "idrepo-client"
+    },
+    {
+      "id": "insert",
+      "service": "idrepo-identity",
+      "name": "INSERT mosip_idrepo.uin",
+      "kind": 3,
+      "parent": "idrepo-server"
+    },
+    {
+      "id": "assigned",
+      "service": "idrepo-identity",
+      "name": "mosip.identity.uin.assigned",
+      "kind": 1,
+      "parent": "idrepo-server"
+    },
+    {
+      "id": "activated",
+      "service": "idrepo-identity",
+      "name": "mosip.identity.activated",
+      "kind": 1,
+      "parent": "idrepo-server"
+    },
+    {
+      "id": "notify-client",
+      "service": "regproc-group1",
+      "name": "POST /v1/notifier/email/send",
+      "kind": 3,
+      "parent": "process"
+    },
+    {
+      "id": "notify-server",
+      "service": "kernel-notification",
+      "name": "POST /v1/notifier/email/send",
+      "kind": 2,
+      "parent": "notify-client"
+    }
+  ],
+  "scenario_source": "features/nin_001_new_adult_no_hit.feature",
+  "scenario_steps": [
+    {
+      "id": "STEP-1",
+      "text": "When Jarvis uploads \"${rid}.zip\" with \"POST /registrationprocessor/v1/packetreceiver/registrationpackets\"",
+      "expected": "HTTP 200; exactly one mosip.registration.packet.received event for the RID",
+      "spans": [
+        "root",
+        "upload",
+        "pkr",
+        "received"
+      ],
+      "events": [
+        "mosip.registration.packet.received"
+      ]
+    },
+    {
+      "id": "STEP-2",
+      "text": "Then the packet is published on \"packet-receiver-bus-out\" and processed by the stage group (validation, bio-dedupe NO_HIT)",
+      "expected": "one producer span and one consumer span, consumer child of producer; validation and dedupe executed",
+      "spans": [
+        "publish",
+        "process",
+        "validate",
+        "dedupe"
+      ],
+      "events": []
+    },
+    {
+      "id": "STEP-3",
+      "text": "And a UIN is generated and the identity is created for \"${rid}\"",
+      "expected": "exactly one mosip.identity.uin.assigned event, effect value as approved, upload-to-assignment <= 2000 ms (demo threshold)",
+      "spans": [
+        "uin-client",
+        "uin-server",
+        "idrepo-client",
+        "idrepo-server",
+        "insert",
+        "assigned"
+      ],
+      "events": [
+        "mosip.identity.uin.assigned"
+      ],
+      "checks": [
+        "NFR-DEMO-LATENCY"
+      ]
+    },
+    {
+      "id": "STEP-4",
+      "text": "And the identity is activated",
+      "expected": "exactly one mosip.identity.activated event, after the assignment",
+      "spans": [
+        "activated"
+      ],
+      "events": [
+        "mosip.identity.activated"
+      ],
+      "checks": [
+        "EVENT-PARTIAL-ORDER"
+      ]
+    },
+    {
+      "id": "STEP-5",
+      "text": "And the resident is notified by email",
+      "expected": "one notification call answered 200",
+      "spans": [
+        "notify-client",
+        "notify-server"
+      ],
+      "events": []
+    }
+  ],
+  "max_upload_to_assignment_ms": 2000,
+  "metric_name": "oaef.synthetic.journey.duration",
+  "metric_unit": "s",
+  "notes": "The 2-second threshold is a DEMO-only threshold, NOT the 24-hour NF-04 requirement. The three required events are a selected subset of the full workflow. journey_spans is the expected span tree per transaction (kind: 1 internal, 2 server, 3 client, 4 producer, 5 consumer); the simulator builds its own tree independently, so the two can disagree. service_metrics: each server records one http.server.request.duration measurement per transaction (semantic conventions, seconds); its sum must equal the durations of that service's server spans (metrics reconciled with traces). service_graph_edges: topology expected in Tempo's derived service graph; a health check only, because derived metrics are aggregated and may drop late spans.",
+  "service_metrics": [
+    {
+      "service": "regproc-pkr",
+      "name": "http.server.request.duration",
+      "unit": "s",
+      "method": "POST",
+      "route": "/registrationprocessor/v1/packetreceiver/registrationpackets",
+      "per_transaction": 1
+    },
+    {
+      "service": "idgenerator",
+      "name": "http.server.request.duration",
+      "unit": "s",
+      "method": "GET",
+      "route": "/v1/idgenerator/uin",
+      "per_transaction": 1
+    },
+    {
+      "service": "idrepo-identity",
+      "name": "http.server.request.duration",
+      "unit": "s",
+      "method": "POST",
+      "route": "/idrepository/v1/identity/",
+      "per_transaction": 1
+    },
+    {
+      "service": "kernel-notification",
+      "name": "http.server.request.duration",
+      "unit": "s",
+      "method": "POST",
+      "route": "/v1/notifier/email/send",
+      "per_transaction": 1
+    }
+  ],
+  "service_graph_edges": [
+    [
+      "jarvis-e2e",
+      "regproc-pkr"
+    ],
+    [
+      "regproc-pkr",
+      "regproc-group1"
+    ],
+    [
+      "regproc-group1",
+      "idgenerator"
+    ],
+    [
+      "regproc-group1",
+      "idrepo-identity"
+    ],
+    [
+      "regproc-group1",
+      "kernel-notification"
+    ]
+  ]
+}

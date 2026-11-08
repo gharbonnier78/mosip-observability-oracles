@@ -1,0 +1,527 @@
+{
+  "attempts": 21,
+  "backend_errors": {},
+  "collect_seconds": 90.19,
+  "collect_started_ns": "1794073429883292609",
+  "collection_log": [
+    {
+      "attempt": 1,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 33,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 0.0,
+      "tempo": {
+        "error": null,
+        "ms": 816,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 2,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 43,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 3.88,
+      "tempo": {
+        "error": null,
+        "ms": 839,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 3,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 38,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 7.79,
+      "tempo": {
+        "error": null,
+        "ms": 1369,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 4,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 53,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 19,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 12.22,
+      "tempo": {
+        "error": null,
+        "ms": 1539,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 5,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 45,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 16.85,
+      "tempo": {
+        "error": null,
+        "ms": 1476,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 6,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 52,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 21.4,
+      "tempo": {
+        "error": null,
+        "ms": 1498,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 7,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 40,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 25.98,
+      "tempo": {
+        "error": null,
+        "ms": 1491,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 8,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 39,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 30.54,
+      "tempo": {
+        "error": null,
+        "ms": 1535,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 9,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 34,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 35.16,
+      "tempo": {
+        "error": null,
+        "ms": 1512,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 10,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 34,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 39.73,
+      "tempo": {
+        "error": null,
+        "ms": 1308,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 11,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 49,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 44.11,
+      "tempo": {
+        "error": null,
+        "ms": 1478,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 12,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 36,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 48.66,
+      "tempo": {
+        "error": null,
+        "ms": 1344,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 13,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 45,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 53.08,
+      "tempo": {
+        "error": null,
+        "ms": 1519,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 14,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 42,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 57.67,
+      "tempo": {
+        "error": null,
+        "ms": 1248,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 15,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 33,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 61.99,
+      "tempo": {
+        "error": null,
+        "ms": 1246,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 16,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 47,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 20,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 66.3,
+      "tempo": {
+        "error": null,
+        "ms": 1349,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 17,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 40,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 16,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 70.74,
+      "tempo": {
+        "error": null,
+        "ms": 1534,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 18,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 42,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 75.34,
+      "tempo": {
+        "error": null,
+        "ms": 1310,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 19,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 36,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 17,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 79.72,
+      "tempo": {
+        "error": null,
+        "ms": 1277,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 20,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 44,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 17,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 84.07,
+      "tempo": {
+        "error": null,
+        "ms": 1517,
+        "requests": 100,
+        "returned": 100
+      }
+    },
+    {
+      "attempt": 21,
+      "complete": false,
+      "loki": {
+        "error": null,
+        "lines": 300,
+        "ms": 33,
+        "parsed": 300
+      },
+      "prometheus": {
+        "error": null,
+        "ms": 15,
+        "series": 10,
+        "service_series": 3
+      },
+      "t_s": 88.66,
+      "tempo": {
+        "error": null,
+        "ms": 1295,
+        "requests": 100,
+        "returned": 100
+      }
+    }
+  ],
+  "loki_limit": 2500,
+  "loki_selector": "{service_name=~\"idrepo-identity|regproc-pkr\"}",
+  "loki_truncated_possible": false,
+  "metric_series": 10,
+  "parse_errors": [],
+  "parsed_log_records": 300,
+  "poll_s": 3.0,
+  "queried_base": "http://localhost:3000",
+  "queried_log_records": 300,
+  "queried_trace_count": 100,
+  "queries": {
+    "loki": {
+      "direction": "forward",
+      "end_ns": "1794073486693704513",
+      "limit": 2500,
+      "query": "{service_name=~\"idrepo-identity|regproc-pkr\"} |= \"s1-63e6b912f564\"",
+      "start_ns": "1794073411505704513"
+    },
+    "prometheus": "{__name__=~\"oaef_synthetic_journey_duration.*\",oaef_run_id=\"s1-63e6b912f564\"} (instant)",
+    "tempo": "GET /api/traces/{trace_id} for each emitted trace id"
+  },
+  "query_end_ns": "1794073486693704513",
+  "query_start_ns": "1794073411505704513",
+  "returned_trace_count": 100,
+  "scope": "synthetic S1 observation only; no actual MOSIP SUT",
+  "source": "Grafana proxy Tempo/Loki/Prometheus API",
+  "timeout_s": 90.0,
+  "uids": {
+    "loki": "loki",
+    "prometheus": "prometheus",
+    "tempo": "tempo"
+  },
+  "verifier_code_sha256": {
+    "v5_backend.py": "43c6f47540e39de36593cfc22785e2f92a58c7c2cb9e0634cd0058563293856d",
+    "v5_demo.py": "f29ddfad4655494183927c151efb8aec98709881d87a65f6a4d230f57f5f8566"
+  }
+}
