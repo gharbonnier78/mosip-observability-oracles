@@ -278,7 +278,90 @@ flowchart TB
 
 ## 12. Limits (say them)
 
-- S1 is a simulation of the MOSIP flow; S2-read proves the signals reach the backends and the verdict holds there. Neither is product conformance.
-- 2000 checks per run are NOT_EVALUATED (REST, DB, audit, notification content, spec metrics): increments C2, C3, C5.
-- Business-rule values (UIN, VID, RID formats and check digits) are synthetic; scenario generation from the model (C4) is not done: only NIN-001 and its fault variants run.
-- Screenshots and dashboards are views; the verdict is in the sealed bundle.
+Short version: **the demonstrator proves the testing machinery, end to end, on one path of the model; it proves nothing about MOSIP's behaviour or performance.** The details below are measured against the two specifications a reviewer will hold: the UML models (`models/*.puml`) and the SLA / non-functional register (`models/nin-requirements.md`, NF-01..NF-09). Figures are from run 42420471946.
+
+### 12.1 What kind of evidence this is
+
+| Mode | What is real | What is not |
+|---|---|---|
+| S1 (simulation) | the oracle, compiled from the specification; OTLP export; the verdict logic | the system: `validation/v5_sim_spec.py` emits the spans, events and metrics the MOSIP flow would emit, with synthetic identifiers and simulated durations |
+| S2-read (backends) | Tempo, Loki, Prometheus ingest, store and return the signals; the verdict is recomputed on what they return | the source is still the simulator |
+| S2 (target) | the same contract on an instrumented MOSIP platform with API, DB and audit evidence | not done |
+
+The simulator and the oracle are written by the same team. Two safeguards keep a PASS meaningful: the simulator is written from the MOSIP flow, not from the contract, and every fault case must be caught with the right class (§5). They show that the oracle **detects** deviations; they cannot show that a real MOSIP **conforms**.
+
+### 12.2 Against the UML models
+
+**Use case diagram** (`nin-usecase.puml`, deck slide 19). Not parsed: it is documentation. NIN-001 exercises *Upload packet*, *Deduplicate identity* (as regproc stage spans only), *Issue NIN and VID*, *Notify resident* (as a business event only). Not exercised: *Capture biometrics*, *Introduce child* (F-12), *Adjudicate duplicate* (F-06), *Verify NIN* (F-11), *Consult audit trail* (F-10).
+
+**Activity diagram** (`nin-enrolment-activity.puml`, slide 20), lane by lane:
+
+| Lane | Activities | In the simulated journey | Checked by the oracle |
+|---|---|---|---|
+| Resident | arrive, keep RID slip, receive NIN | no (human steps) | no |
+| Enrolment station | capture demographics, biometrics (quality, retries, exception), supervisor approval and RID slip, offline queue, sync and upload | **upload only**: Jarvis plays the station and starts at the upload | upload spans and events; capture, approval, offline queue: no station telemetry |
+| Central platform | validate packet, assign NIN and VID, activate identity and issue credential | yes: packet receiver, audit call, Kafka, 7 stage groups, keymanager, S3, ID generator, ID repository, credential batch (T2), IDA callback (T3) | span tree, links, events, logs, durations; NIN/VID **format and check digit not checked** (synthetic values, C2) |
+| ABIS | demographic and biometric deduplication | only as `demo-dedupe` / `bio-dedupe` stage spans; no ABIS IDENTIFY request/response | stage spans present and successful; no candidate list, no ABIS round trip |
+| Adjudicator | manual adjudication | no | no |
+| Messaging gateway | send NIN by SMS and email in the chosen language | only the `mosip.notification.sent` event | event present, NF-05 delay; no notifier span, no message content, no language (NF-09) |
+
+**Decisions** of the activity diagram and the branch NIN-001 takes:
+
+| Decision | Branch taken | Branches never executed (scenario families, C4) |
+|---|---|---|
+| Quality reached? | yes | no after retries → biometric exception (F-02, NF-02) |
+| Packet valid? | yes | no → reject with reason, notify (F-04, F-09) |
+| Possible match? | no | yes → adjudication (F-05, F-06) |
+| Duplicate confirmed? | not reached | yes → reject, no NIN consumed; no → NIN |
+
+**Traceability is not path coverage.** Each obligation's `model_element_refs` is derived from the requirement tags written on the activities. So an obligation tagged F-04 also points to *Reject with reason*, an activity NIN-001 never goes through. The refs say which part of the model a check is about, not that the path was executed. Path and branch coverage needs the activity paths enumerated from the model (C4, XMI from Modelio).
+
+**Sequence and signal sheets** (draw.io pages 3–4, slides 24–25). Simulated: upload, Kafka hand-off, stages, ID generator, ID repository, credential batch and IDA callback joined by span links. Not simulated: ABIS IDENTIFY over JMS, notifier HTTP call, Jarvis status poll returning `PROCESSED` from a real API, VID authentication. The signal sheet's audit column (PACKET_RECEIVER, UIN_GENERATOR, …) is compiled but not evaluated (C5).
+
+### 12.3 Against the SLA / non-functional specification
+
+All bracketed targets in the register are **assumptions [A]** to be confirmed by the authority; none is a contractual SLA yet.
+
+| Req. | Target [A] | What the oracle checks | Status in the live run | Why it does not prove the SLA |
+|---|---|---|---|---|
+| NF-01 | station session ≤ 15 min | — | not covered | no station telemetry (journey starts at upload) |
+| NF-02 | ≤ 3 capture retries | — | not covered (uncovered in `coverage.json`) | no capture spans |
+| NF-03 | offline ≥ 72 h, no loss | compiled refs only | not evaluated | no offline queue simulated; would need an offline scenario |
+| NF-04 | upload → NIN ≤ 24 h | `OBL-EVENTS-NF-04:duration`, `packet.received` → `identity.activated` ≤ 86 400 s, every transaction | **executed**, 100/100 pass | durations are simulated (whole T1 ≈ 0.5 s), so passing says nothing about MOSIP; the end point (identity activated vs "NIN") must be confirmed |
+| NF-04 (contract) | upload → `PROCESSED` ≤ 600 s | `OBL-NFR-e2e_upload_to_processed_s` | not evaluated | needs the status API (C2) |
+| NF-05 | notification ≤ 15 min after issuance | `OBL-EVENTS-NF-05:duration` ≤ 900 s | **executed**, pass | same: simulated time; notification only as an event |
+| span budgets | PKR ≤ 5 s, uploader ≤ 30 s, ID repository create ≤ 3 s, ID generator ≤ 500 ms | `OBL-NFR-span_budgets_ms` per alias, every transaction | **executed**, 400 checks; `slow` case caught (3150 ms > 3000 ms) | these budgets are oracle-author assumptions, not in the register: each needs an owner and a source SLA |
+| NF-06 | DR: RPO ≤ 15 min, RTO ≤ 4 h | site attribute `cloud.region` on every signal | partly: stamping only | single site (dc1); no failover, no replication measurement |
+| NF-07 | no PII in clear; audit immutable | identifiers and contacts forbidden in business events (`OBL-EVENTS-FORBIDDEN:pii`) | **executed** on events; span-attribute rule (`OBL-NFR-security`) not evaluated | values are synthetic; audit immutability needs the audit stores (C5) and WORM |
+| NF-08 | signal contract 100 %, env and site on every signal | common span rules (ids, env, cluster, site, env id), span tree, links, events, logs | **executed** | measured on the simulator's output; collector-side stamping and real agents not exercised |
+| NF-09 | 4 notification languages | — | not covered | no notification content (C5) |
+| infra | 0 pod restarts, Kafka lag back to 0 | `OBL-NFR-infra_window_checks` | not evaluated | no Kubernetes or Kafka in S1 |
+
+Further points a reviewer will raise, and the current answer:
+
+- **Per transaction, not percentile.** The oracle applies each time target to **every** transaction (a maximum). The register does not say whether an SLA is a maximum, a p95 or a mean, nor under which load. This must be agreed with the authority before any SLA verdict counts.
+- **No load model.** 100 transactions are emitted in seconds with no concurrency, saturation or soak. This is a functional and evidence demonstrator, not a performance test; the journey histogram is a navigation aid, not a capacity measurement.
+- **Clocks.** Cross-service durations assume synchronised clocks. In S1 there is one clock; in S2 the tolerated skew must be specified and checked.
+- **A missing signal stops the SLA check.** If an event that bounds a duration is missing, the duration cannot be measured and the verdict is INCONCLUSIVE (evidence gap), never PASS.
+
+### 12.4 Oracle and verdict limits
+
+- **2000 of about 6400 checks per run are NOT_EVALUATED:** REST and business rules (C2), the specification metrics M1–M5, ENV1–2, X1 (C3), DB state, audit and notification (C5), the status-based and infra NFRs. They are reported, never counted as passed.
+- **Golden values** (`$golden`, e.g. the audit event catalogue) need an approved reference run, which exists only for a real platform.
+- **Verdict classes.** The contract defines the seven classes of deck slide 15 (PASS, PASS_OBSERVABILITY_DEFECT, INCONCLUSIVE, INFRA, SILENT_FAILURE, TEST_DATA_CONFIG, PRODUCT_BUG). The engine produces PASS / FAIL / INCONCLUSIVE with six diagnostic classes. Distinguishing infrastructure from product needs infra checks and error spans from a real system (C6).
+- **Evidence integrity.** Each bundle is hashed (SHA-256) and can be re-evaluated offline; it is not signed, and storage is not write-once.
+- **Scope of runs.** One scenario of about 45 (NIN-001) with 8 fault variants; the fault variants are telemetry and oracle mutations, not catalogue scenarios.
+- Screenshots, dashboards and the video are views; the verdict is in the sealed bundle.
+
+### 12.5 What closes each limit
+
+| Limit | Closed by |
+|---|---|
+| REST bodies, NIN/VID/RID rules, status API, `e2e_upload_to_processed_s` | C2 |
+| specification metrics, environment labels, exemplar link | C3 |
+| unexecuted branches and other use cases (reject, adjudication, exception, child, verify NIN, offline, DR) | C4: paths from the model (XMI), generated scenarios |
+| DB before/after, audit (F-10, NF-07), notification content and language (NF-09) | C5 |
+| seven verdict classes, infra window, first source | C6 |
+| SLA definitions (maximum or percentile, load, end points), budget ownership | specification review with the authority |
+| real behaviour and real performance | S2 on an instrumented MOSIP, with a load profile |
+| signature and write-once storage | evidence platform (later) |
