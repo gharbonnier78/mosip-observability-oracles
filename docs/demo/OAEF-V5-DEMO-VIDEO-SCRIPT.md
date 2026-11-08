@@ -32,7 +32,7 @@
 | 10 | 7:00–7:40 | Grafana → Dashboards → OAEF → *Test runs*, then click a run id → *Journey* | "The verdicts are published back into Grafana. Operations and testers look at the same dashboards: runs by verdict, failures by class, and the journey of each run." |
 | 11 | 7:40–8:10 | Tab 8 Allure overview → Categories | "Allure gives the campaign view; categories are the diagnostic classes. The same results can be imported into Xray." |
 | 12 | 8:10–8:40 | Terminal (pre-typed): `python3 validation/v5_backend.py verify-bundle --out <duplicate>` then `re-evaluate` | "Every run is sealed with SHA-256. Anyone can verify the bundle and recompute the verdict offline. It must match." |
-| 13 | 8:40–9:00 | Deck slide 51 (done / remains) | "What remains: REST messages and business rules, specification metrics, scenarios generated from the model, database and audit evidence, the full verdict classes, signed write-once storage, and finally the same oracle on an instrumented MOSIP platform." |
+| 13 | 8:40–9:00 | Deck slide 52 (done / remains) | "What remains: REST messages and business rules, specification metrics, scenarios generated from the model, database and audit evidence, the full verdict classes, signed write-once storage, and finally the same oracle on an instrumented MOSIP platform." |
 
 ## 2. Recording rules for a GenAI screen agent
 
