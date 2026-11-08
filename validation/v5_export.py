@@ -100,7 +100,7 @@ def main(root):
               'Diagrams are embedded and readable offline; Grafana links need the original stack.\n'
               'Each run folder is a sealed evidence bundle: python3 validation/v5_backend.py verify-bundle --out <folder>\n'
               'xray/cucumber.json: Xray Cucumber import (one scenario per run, report attached).\n'
-              'screenshots/ and <run>/screenshots/: Grafana, Tempo, Loki, Prometheus, dashboards, reports and Allure,\n'
+              'screenshots/ and screenshots/<run>/: Grafana, Tempo, Loki, Prometheus, dashboards, reports and Allure,\n'
               '  captured by validation/demo/capture_screens.py (Playwright script, after sealing; index.json lists them).\n'
               'allure-report/: open allure-report/index.html through a web server (e.g. python3 -m http.server).\n'
               'specification/: requirements, activity model, oracle spec (YAML), compiled contract and coverage.\n'

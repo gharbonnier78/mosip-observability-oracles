@@ -381,3 +381,148 @@ Further points a reviewer will raise, and the current answer:
 | SLA definitions (maximum or percentile, load, end points), budget ownership | specification review with the authority |
 | real behaviour and real performance | S2 on an instrumented MOSIP, with a load profile |
 | signature and write-once storage | evidence platform (later) |
+
+## 13. Perspectives: four open-source additions, applied to NIN Registration
+
+**Status: proposals.** None of these tools has been run on the demonstrator. The only executed item in this section is the forgery test in §13.4, which uses OAEF alone. The YAML and commands are sketches, written from each project's documentation, to adapt when the tool is tried. Matrix cells marked "by design" are expected behaviour, not results.
+
+**Principle:** the OAEF oracle remains the judge of one transaction against its requirements. Each addition covers something the oracle does not do, at another moment of the NIN chain.
+
+| Moment in the NIN chain | Question | Tool | Licence |
+|---|---|---|---|
+| Supplier delivers an instrumented component | Are the signals shaped as agreed? | OTel Weaver `live-check` | Apache-2.0 |
+| Platform team changes the collector or Gold pipeline | Does the pipeline stamp and route correctly? | Grafana OATs | Apache-2.0 |
+| End-to-end campaign | Is each transaction exactly right? | **OAEF oracle (stays)** | to be decided |
+| Acceptance, or a dispute months later | Is this the verdict that was really produced? | in-toto + Sigstore | Apache-2.0 |
+
+### 13.1 Who catches what
+
+| Problem on NIN Registration | OAEF today | Weaver | OATs | in-toto + Sigstore |
+|---|---|---|---|---|
+| TX-017 receives two `mosip.identity.uin.assigned` events (F-07) | **Yes, executed** | No: each event is well formed | Only per known RID, by design | No |
+| `mosip.identity.activated` carries a wrong hash (F-08) | **Yes, executed** (`wrong_value`) | No: right type, wrong value | Only per known RID, by design | No |
+| A supplier emits `rid` instead of `mosip.rid` (F-04, NF-08) | Yes, but only at end-to-end, by design | **Yes, at delivery**, by design | Possible, by design | No |
+| DC2 collector labels its signals DC1 (NIN-083) | Not yet: environment checks are compiled, not evaluated | No: it can check presence, not the right site | **Yes**, by design | No |
+| A failed run is rewritten as PASS (§13.4) | **No: tested, it passes** | No | No | **Yes**, by design |
+
+### 13.2 Use case A: reject a wrong signal when the supplier delivers (Weaver)
+
+**Situation.** A supplier delivers an instrumented packet receiver (`regproc-pkr`) for NIN-001. The oracle requires the event `mosip.registration.packet.received` with `mosip.rid` (F-04). The supplier's build emits `rid`.
+
+**Today.** Nothing fails until the component is integrated and a full campaign runs on the shared platform. Then one obligation fails, and someone must work out who is responsible.
+
+**With Weaver.** The signal contract is published as a registry and handed to the supplier, who runs one packet upload through `live-check` in their own CI:
+
+```yaml
+# nin-registry/events.yaml (sketch)
+groups:
+  - id: event.packet.received
+    type: event
+    name: mosip.registration.packet.received
+    stability: development
+    brief: A registration packet was received (F-04).
+    attributes:
+      - ref: mosip.rid
+        requirement_level: required
+```
+
+```bash
+weaver registry live-check --registry nin-registry/
+```
+
+Weaver reports findings by level and returns a non-zero exit code when any finding is a `violation`, so the supplier's build stops.
+
+**What it brings to NIMS.** A testable delivery rule for the OTEL / audit / labels column of the deployment contracts: none of the 141 is filled today. The registry could also be generated from `NIN-001.oracle.yaml`, so that there is one source.
+
+**What it does not see.** The duplicate on TX-017 and the wrong hash are well-formed signals. Those stay with the oracle.
+
+### 13.3 Use case B: prove the collector stamps the right site (OATs)
+
+**Situation.** NIN-083: a DC2 cluster is labelled DC1 at the collector. NF-08 requires every signal to carry its environment and site, and NIN-080 expects `cloud.region=dc2` after failover. In the demonstrator the simulator stamps these attributes itself, so collector-side stamping is not exercised.
+
+**Today.** A wrong label would corrupt every later run on that site, and nothing tests the pipeline on its own.
+
+**With OATs.** One small test is run on every change to the Alloy configuration, with a seeded signal and no MOSIP deployment:
+
+```yaml
+# nin-083-site-stamping.oats.yaml (sketch)
+name: NIN-083 DC2 collector stamps its own site
+seed:
+  type: inline-otlp
+  traces:
+    - service: idrepo-identity
+      spans:
+        - name: seed-idrepo-create
+expected:
+  traces:
+    - traceql: '{ resource.service.name = "idrepo-identity" && resource.cloud.region = "dc2" }'
+      count: '>= 1'
+    - traceql: '{ resource.service.name = "idrepo-identity" && resource.cloud.region = "dc1" }'
+      absent: true
+```
+
+**What it brings to NIMS.** A fast non-regression test for WP0.1 and the Gold stack, available before MOSIP is instrumented. The same form covers NIN-092: with log export disabled on one service, `count: '>= 1'` on that service's logs fails.
+
+**What it does not see.** OATs checks chosen queries. Checking 100 transactions exactly would mean generating one case per RID, and it has no verdict classes, requirement traceability or sealed bundle. To verify when trying it: how to route the seed through our Alloy rather than the default stack.
+
+### 13.4 Use case C: prove a verdict was not rewritten (in-toto + Sigstore)
+
+**Situation.** A supplier disputes the finding "TX-017 received two NINs" months after acceptance (F-07). Someone must show that the sealed verdict is the one produced.
+
+**Executed test, 2026-11-08.** On a scratch copy of the `duplicate` bundle of run 42420471946, with the verifier code of commit `0f9f3fc`:
+
+| Step | `verify-bundle` | `re-evaluate` |
+|---|---|---|
+| Original bundle | True | MATCH: FAIL, 1 failed check on TX-017 (`OBL-EVENTS-EV_UIN_ASSIGNED:count`, expected 1, actual 2) |
+| Edit `backend-verdict.json` to PASS, nothing else | **False: detected** | not run |
+| Remove the second event from `collected-otel.json`, adjust `backend-meta.json` and `backend-verdict.json`, recompute `evidence-sha256.json` | **True: not detected** | **MATCH: PASS, 0 failed** |
+
+So simple tampering is detected, and a careful forger is not. This is what "tamper-evident, not immutable" means in practice. In this test `report.html` and the raw Loki answer still showed the duplicate, but no check compares them, and a forger could change them too.
+
+Method note: the `screenshots/` folder had to be removed from the copy first. See the correction at the end of this section.
+
+**With in-toto + Sigstore.** At the end of the run, a key held outside the campaign signs a statement about the hash list:
+
+```json
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [{"name": "duplicate/evidence-sha256.json",
+               "digest": {"sha256": "e235c9cade19951a3e01fd18cceeddd9d43234b7a66f4d118a3eef5a4bd9a40b"}}],
+  "predicateType": "https://in-toto.io/attestation/test-result/v0.1",
+  "predicate": {
+    "result": "FAILED",
+    "configuration": [{"name": "contract.json",
+                       "digest": {"sha256": "dce6d3d4070b2bd263b473f8a11b79dc153d84e71a6b7ee8a2551ccec1ce6fcf"}}],
+    "url": "https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946",
+    "failedTests": ["OBL-EVENTS-EV_UIN_ASSIGNED:count TX-017"]
+  }
+}
+```
+
+The digests above are the real ones. The forged list has another digest (`0979dd08…`), so verification against the signed statement fails, by design.
+
+```bash
+cosign attest-blob --predicate test-result.json --type https://in-toto.io/attestation/test-result/v0.1 --key <kms-uri> --bundle duplicate.sigstore.json evidence-sha256.json
+```
+
+```bash
+cosign verify-blob-attestation --bundle duplicate.sigstore.json --key <public-key> --type https://in-toto.io/attestation/test-result/v0.1 evidence-sha256.json
+```
+
+**What it brings to NIMS.** WP0-SEC-06, and an acceptance rule a machine can enforce: a NIN-001 release is accepted only with a signed `PASSED` result from the expected workflow.
+
+**What it does not give.** The proof is only as strong as the key custody: a forger who holds the key can sign. For a national identity programme this means an HSM or KMS, and a private Rekor, because the public log exposes metadata. It proves integrity, not retention, so write-once storage is still needed (WP0-INF-02).
+
+**Defect found by this test, now corrected.** The bundles in the offline zip of run 42420471946 fail `verify-bundle` as delivered, because `capture_screens.py` added `screenshots/` to each run folder after sealing. No sealed file differs: the 28 sealed hashes all match, and the 5 screenshots are the only extra files. To check a bundle from that older zip, delete its `screenshots/` folder first. Screenshots now go to `screenshots/<case>/` at campaign level, and the CI workflow fails if any sealed bundle no longer verifies.
+
+### 13.5 Tracetest: a reference, not a dependency
+
+Tracetest popularised assertions on spans, and its selector language is worth reading. It works on traces, so it would not see the duplicate on TX-017, which is a log event. Its last release dates from October 2024 and its last commit from June 2025. Its licence is mixed (MIT and a Tracetest Community License, per file). Use it as a comparison point in a publication, not as a component.
+
+### 13.6 Suggested order
+
+| Order | Addition | Why then | Done when |
+|---|---|---|---|
+| 1 | Signature of the bundle | Smallest change; closes a limit we have demonstrated | The forged bundle of §13.4 is rejected |
+| 2 | Weaver registry for NIN-001 | Needed before supplier intake | A renamed `mosip.rid` stops a sample build |
+| 3 | OATs on the Alloy configuration | Useful as soon as the Gold pipeline exists | NIN-083 and NIN-092 fail and pass as expected |

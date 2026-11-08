@@ -68,6 +68,15 @@ jobs:
         if: always()
         run: |
           docker run --rm --network host --ipc host -e GF_ADMIN_PASSWORD -e OAEF_OUT=/w/oaef-v5 -v "$GITHUB_WORKSPACE:/w" -w /w "$PLAYWRIGHT_IMAGE" bash -c "pip install --quiet --break-system-packages playwright==$PLAYWRIGHT_VERSION && python3 validation/demo/capture_screens.py --out /w/oaef-v5"
+      - name: Check that every sealed bundle is still intact
+        if: always()
+        shell: bash
+        run: |
+          for f in "$OAEF_OUT"/*/evidence-sha256.json; do
+            [ -e "$f" ] || continue
+            echo "$f"
+            python3 validation/v5_backend.py verify-bundle --out "$(dirname "$f")" || exit 1
+          done
       - name: Rebuild the offline campaign zip with screenshots and Allure
         if: always()
         run: python3 validation/v5_export.py "$OAEF_OUT"

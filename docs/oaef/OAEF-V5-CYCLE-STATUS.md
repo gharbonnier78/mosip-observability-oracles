@@ -1,7 +1,7 @@
 # OAEF — full-cycle status against the deck (2026-11-07, branch `docs/oaef-v5-model-to-evidence-demo`, after C1)
 
 Question: is the cycle promised by *Observability-First Evidence-Based Testing* (slides 7 "From use case to oracle", 8 "Anatomy of one step", 16 "The loop", 18–39 worked example) implemented end to end?
-**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 40–55).
+**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 40–59).
 
 Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated** = in the executed contract, reported `NOT_EVALUATED` · **Specified** = written and reviewed, not executed · **Missing** = neither.
 
@@ -52,6 +52,7 @@ Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated**
 | Deck | section 6 added: real run 42420471946, process, specification, injection, validation, evidence screenshots, GenAI vs script, status; slides 18–35 remain the target design (marked illustrative where so) |
 | `OAEF-SPEC-001` / `OAEF-VTS-001` (Word/PDF) | predate V5; not updated (→ C7) |
 | V5 addendum `docs/oaef/OAEF-V5-MODEL-TO-EVIDENCE-ADDENDUM.md` | missing (→ C7) |
+| Perspectives with NIN Registration use cases (Weaver, OATs, in-toto + Sigstore), including an executed bundle-forgery test | user guide §13, deck slides 54–57; tools not yet run |
 | Signal communication diagrams (Metric, Trace, Logs) | `docs/diagrams/nin-001-signal-communication.drawio`, each element marked demonstrated / target / open; deck slides 33–35 |
 | draw.io pages 3–6 generated from the contract | proposed, not done |
 

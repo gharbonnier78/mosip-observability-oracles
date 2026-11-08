@@ -7,7 +7,7 @@ OAEF dashboards, service graph), the HTML reports, the runs page and the Allure 
 Runs in the official Playwright image in CI (mcr.microsoft.com/playwright/python, pinned) or wherever
 `pip install playwright && playwright install chromium` is done. Grafana password from GF_ADMIN_PASSWORD /
 OAEF_GRAFANA_PASSWORD (never written anywhere). For each run folder it shoots the transaction to investigate
-(first failed one, else TX-001) and writes <run>/screenshots/*.png; campaign views go to <out>/screenshots/.
+(first failed one, else TX-001) and writes <out>/screenshots/<run>/*.png, never inside a sealed run folder; campaign views go to <out>/screenshots/.
 Index: <out>/screenshots/index.json (file, caption, url, status). Screenshots are taken after sealing: they
 illustrate the evidence, they are not part of the sealed bundle and never change a verdict.
 """
@@ -48,7 +48,7 @@ def plan(out, grafana, reports):
         aliases = load(d / 'collected-verdict.json').get('span_aliases', {})
         focus = next((s['spanId'] for s in spans if failed and aliases.get(s['spanId']) == failed[0].get('ref')), None)
         sel = meta.get('loki_selector', '{service_name=~".+"}')
-        base = f'{case}/screenshots'
+        base = f'screenshots/{case}'
         if trace:
             shots.append((f'{base}/01-tempo-trace-{tx}.png', f'{case}: Tempo trace of {tx} (span tree with timings)'
                           + (f', focused on {failed[0].get("ref")}' if focus else ''), links.trace(trace, focus), 'grafana'))
