@@ -2,7 +2,7 @@
 
 **Audience:** test engineers, reviewers and demo drivers. **Scope:** NIN-001 (new adult, no deduplication hit), synthetic S1 journey observed through real Tempo, Loki and Prometheus (S2-read). Nothing here is a MOSIP verification.
 **Figures:** every screenshot below comes from GitHub Actions run [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946) (commit `0f9f3fc`, 2026-11-07), taken by the Playwright script `validation/demo/capture_screens.py`, not by hand and not by an AI.
-**Companion documents:** live demo [runbook](OAEF-V5-LIVE-DEMO-RUNBOOK.md) (timed script, recovery, run records), [compiler design](../oaef/OAEF-V5-SPEC-COMPILER-DESIGN.md), [cycle status](../oaef/OAEF-V5-CYCLE-STATUS.md), process models in [`docs/process/`](../process/).
+**Companion documents:** live demo [runbook](OAEF-V5-LIVE-DEMO-RUNBOOK.md) (timed script, recovery, run records), [compiler design](../oaef/OAEF-V5-SPEC-COMPILER-DESIGN.md), [cycle status](../oaef/OAEF-V5-CYCLE-STATUS.md), process models in [`docs/process/`](../process/), signal communication diagrams (Metric, Trace, Logs) in [`docs/diagrams/nin-001-signal-communication.drawio`](../diagrams/nin-001-signal-communication.drawio).
 
 ---
 
@@ -348,7 +348,7 @@ All bracketed targets in the register are **assumptions [A]** to be confirmed by
 | NF-05 | notification ≤ 15 min after issuance | `OBL-EVENTS-NF-05:duration` ≤ 900 s | **executed**, pass | same: simulated time; notification only as an event |
 | span budgets | PKR ≤ 5 s, uploader ≤ 30 s, ID repository create ≤ 3 s, ID generator ≤ 500 ms | `OBL-NFR-span_budgets_ms` per alias, every transaction | **executed**, 400 checks; `slow` case caught (3150 ms > 3000 ms) | these budgets are oracle-author assumptions, not in the register: each needs an owner and a source SLA |
 | NF-06 | DR: RPO ≤ 15 min, RTO ≤ 4 h | site attribute `cloud.region` on every signal | partly: stamping only | single site (dc1); no failover, no replication measurement |
-| NF-07 | no PII in clear; audit immutable | identifiers and contacts forbidden in business events (`OBL-EVENTS-FORBIDDEN:pii`) | **executed** on events; span-attribute rule (`OBL-NFR-security`) not evaluated | values are synthetic; audit immutability needs the audit stores (C5) and WORM |
+| NF-07 | no PII in clear; audit immutable | identifiers and contacts forbidden in business events and logs (`OBL-EVENTS-FORBIDDEN:pii`, `OBL-LOGS-FORBIDDEN:pii`) | **executed** on events and logs; span-attribute rule (`OBL-NFR-security`) not evaluated | values are synthetic; audit immutability needs the audit stores (C5) and WORM |
 | NF-08 | signal contract 100 %, env and site on every signal | common span rules (ids, env, cluster, site, env id), span tree, links, events, logs | **executed** | measured on the simulator's output; collector-side stamping and real agents not exercised |
 | NF-09 | 4 notification languages | — | not covered | no notification content (C5) |
 | infra | 0 pod restarts, Kafka lag back to 0 | `OBL-NFR-infra_window_checks` | not evaluated | no Kubernetes or Kafka in S1 |

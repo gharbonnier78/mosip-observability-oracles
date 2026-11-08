@@ -20,7 +20,7 @@
 
 | # | Time | Screen and navigation | Narration (say) |
 |---|---|---|---|
-| 1 | 0:00–0:40 | Deck slide 36 (live run divider), then slide 37 (process) | "This is one real run of the OAEF demonstrator. A synthetic NIN-001 journey, a new adult with no deduplication hit, is observed through real Tempo, Loki and Prometheus. People write and review the specification; scripts do everything else, with no AI in the run path." |
+| 1 | 0:00–0:40 | Deck slide 40 (live run divider), then slide 41 (process) | "This is one real run of the OAEF demonstrator. A synthetic NIN-001 journey, a new adult with no deduplication hit, is observed through real Tempo, Loki and Prometheus. People write and review the specification; scripts do everything else, with no AI in the run path." |
 | 2 | 0:40–1:40 | Tab 1 → `models/nin-requirements.md` (scroll the table), `models/nin-enrolment-activity.puml` | "The inputs are owned by people: the requirement register, functional F and non-functional NF, and the activity diagram with its lanes. Each activity carries the requirements it realises." |
 | 3 | 1:40–2:30 | Tab 2 `oracles/NIN-001.oracle.yaml`: show `spans:` (one alias with parent, attributes, `requirements:`), then `events:` | "The oracle specification says exactly which spans, links, events and logs every transaction must leave, and which requirement each one proves." |
 | 4 | 2:30–3:10 | Tab 3 compiled contract: search `"obligation_id"`, show one with `requirement_refs` and `model_element_refs`; then `generated/coverage.json` → `uncovered` | "A script compiles this into the executed contract: 60 obligations, each traced to its requirement and model element. CI fails if anyone edits the specification and forgets to recompile. Coverage shows three requirements without obligations for this scenario: F-11, F-12 and NF-02." |
@@ -32,7 +32,7 @@
 | 10 | 7:00–7:40 | Grafana → Dashboards → OAEF → *Test runs*, then click a run id → *Journey* | "The verdicts are published back into Grafana. Operations and testers look at the same dashboards: runs by verdict, failures by class, and the journey of each run." |
 | 11 | 7:40–8:10 | Tab 8 Allure overview → Categories | "Allure gives the campaign view; categories are the diagnostic classes. The same results can be imported into Xray." |
 | 12 | 8:10–8:40 | Terminal (pre-typed): `python3 validation/v5_backend.py verify-bundle --out <duplicate>` then `re-evaluate` | "Every run is sealed with SHA-256. Anyone can verify the bundle and recompute the verdict offline. It must match." |
-| 13 | 8:40–9:00 | Deck slide 47 (done / remains) | "What remains: REST messages and business rules, specification metrics, scenarios generated from the model, database and audit evidence, the full verdict classes, signed write-once storage, and finally the same oracle on an instrumented MOSIP platform." |
+| 13 | 8:40–9:00 | Deck slide 51 (done / remains) | "What remains: REST messages and business rules, specification metrics, scenarios generated from the model, database and audit evidence, the full verdict classes, signed write-once storage, and finally the same oracle on an instrumented MOSIP platform." |
 
 ## 2. Recording rules for a GenAI screen agent
 

@@ -1,0 +1,254 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/27.0.2 Chrome/134.0.6998.205 Electron/35.3.0 Safari/537.36" version="27.0.2" pages="3">
+  <diagram name="Metric" id="vHZzNggdaJd9OMapqYm2">
+    <mxGraphModel dx="3565" dy="2103" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Diagramme de communication — signal OTEL Metric · use case NIN registration (NIN-001, adulte no-hit)" style="text;html=0;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" value="Métrique suivie : http.server.request.duration (histogram, s) émise par regproc-pkr à la réception du paquet (étape B3) → oracle M1 (Δ ≥ 1)" style="text;html=0;fontSize=13;fontColor=#555555;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="58" width="1300" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="A" value="station : Registration Client&#10;(opérateur d'enrôlement)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="B" value="pkr : regproc-pkr&#10;(packet receiver + OTel Java agent)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="C" value="meter : MeterProvider&#10;(OTel SDK in-process)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="420" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="I" value="pipeline : regproc-* / idgenerator / idrepo&#10;(OTel agents, spans)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="700" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="D" value="gw : Collecteur&#10;(cible : gateway OTel ;&#10;v0.9 : Grafana Alloy, D10-03)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="420" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="E" value="tsdb : Prometheus (OTLP, PromQL)&#10;(cible : Mimir ou Thanos, D10-02)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="420" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="F" value="jarvis : Test runner&#10;(oracle NIN-001)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="140" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="G" value="traces : Tempo" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="2220" y="140" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="H" value="dash : Grafana&#10;(variables $env / $site)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="700" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="1: POST /registrationpackets&#10;(paquet chiffré, RID)&#10;[D : Jarvis joue la station]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="A" target="B">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="1.1: record(Δt s, {http.request.method=POST,&#10;  http.route, http.response.status_code=200})&#10;1.2: exemplar(trace_id, span_id)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="B" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="2: [PeriodicReader, 60 s] Export()&#10;OTLP/gRPC :4317 · Histogram · CUMULATIVE&#10;resource{service.name=regproc-pkr}&#10;[D : export OTLP par le simulateur]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="C" target="D">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="2.2: spans OTLP/gRPC&#10;→ connector spanmetrics&#10;⇒ traces_span_metrics_calls_total&#10;[D autre chemin : metrics-generator Tempo]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="I" target="D">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="3: OTLP/HTTP POST /otlp/v1/metrics&#10;[D : ingestion OTLP Prometheus ; v0.9 : Alloy, remote write /api/v1/write, pilote D10-09]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="D" target="E">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="4: PromQL M1..M5 @ t0 puis t_end&#10;sum(http_server_request_duration_seconds_count&#10;{env, site, job=&quot;regproc-pkr&quot;, status=200})&#10;4.1: Δ M1 ≥ 1 ✓ · Δ M5 = 0 ✓&#10;5: query_exemplars(…_bucket) → trace_id&#10;[C3 : M1–M5 compilés, NOT_EVALUATED ; en live : 20 contrôles métriques isolés par run]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="F" target="E">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="6: GET trace(trace_id)&#10;trace_id == trace.root ✓&#10;[D : navigation exemplar → trace, pas le verdict]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="F" target="G">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="7: PromQL (dashboards&#10;filtrés env / site)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="H" target="E">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="2.1: processors du collector&#10;• resource : + deployment.environment.name,&#10;  cloud.region, k8s.cluster.name, oaef.site.role&#10;• k8sattributes · memory_limiter · batch&#10;[C : stamping non exercé dans le démonstrateur ; v0.9 : dans Alloy]" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="230" width="340" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" style="endArrow=none;dashed=1;html=0;strokeColor=#b0a24f;" edge="1" parent="1" source="n1" target="D">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="3.1: conversion OTLP → Prometheus (Mimir si retenu, D10-02)&#10;• http.server.request.duration (s) →&#10;  http_server_request_duration_seconds_{bucket,count,sum}&#10;• service.name → job · service.instance.id → instance&#10;• promote_otel_resource_attributes → labels env/site" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="2120" y="400" width="380" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" style="endArrow=none;dashed=1;html=0;strokeColor=#b0a24f;" edge="1" parent="1" source="n2" target="E">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="leg" value="Lecture : objets = instances « nom : rôle » · flèches = liens de communication · numéros = ordre des messages (1.x synchrone dans pkr, 2.x export SDK→collector, 3.x ingestion, 4–7 consommation / vérification oracle)." style="text;html=0;whiteSpace=wrap;fontSize=12;fontColor=#555555;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1600" height="40" as="geometry" />
+        </mxCell>
+      <mxCell id="st_A" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="266.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_B" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_C" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="406.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_I" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="686.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_D" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1386.0" y="406.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_E" value="O" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#C62828;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1926.0" y="406.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_F" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1926.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_G" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="2406.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_H" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1926.0" y="686.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lg_D" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="40.0" y="868.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_D" value="Démontré : signal simulé (S1), lu dans les vrais backends" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="76.0" y="868.0" width="470" height="24" as="geometry" /></mxCell><mxCell id="lg_C" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="560.0" y="868.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_C" value="Cible : pas encore exercé" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="596.0" y="868.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_O" value="O" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#C62828;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="870.0" y="868.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_O" value="Ouvert : décision à prendre" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="906.0" y="868.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_src" value="Statut au 8 nov. 2026 : run CI 42420471946 ; déploiement NIMS 2.0 v0.9 ; WP0 requirements." vertex="1" parent="1" style="text;html=0;fontSize=12;align=left;verticalAlign=middle;fontColor=#555555;"><mxGeometry x="40.0" y="896.0" width="900" height="22" as="geometry" /></mxCell></root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="XoFMo8PnVCp__Qp1fAd7" name="Trace">
+    <mxGraphModel dx="3565" dy="2103" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Diagramme de communication — signal OTEL Trace · use case NIN registration (NIN-001, adulte no-hit)" style="text;html=0;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" value="Trace T1 (trace.root) : contexte W3C propagé par HTTP (traceparent / baggage) et par en-têtes Kafka, d'un bout à l'autre de la chaîne RID → NIN" style="text;html=0;fontSize=13;fontColor=#555555;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="58" width="1400" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="J" value="jarvis : Test runner&#10;(span ROOT « NIN-001 », INTERNAL)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="P" value="pkr : regproc-pkr&#10;(PKR_SERVER, SERVER)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="K" value="bus : Kafka&#10;(topics des étapes regproc)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="140" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="S" value="stages : regproc-group1..7&#10;(STAGE_PROCESS, CONSUMER)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="KM" value="km : keymanager" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="2140" y="140" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="A" value="audit : auditmanager&#10;(AUDIT_SERVER)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="440" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="G" value="idgen : idgenerator&#10;(IDGEN_GET_SERVER)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="440" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="R" value="idrepo : idrepo-identity&#10;(IDREPO_CREATE_SERVER)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="2140" y="440" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="C" value="gw : Collecteur&#10;(cible : gateway OTel ;&#10;v0.9 : Grafana Alloy, D10-03)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="740" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="T" value="traces : Tempo&#10;(TraceQL)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="740" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="1: POST /registrationpackets&#10;traceparent: 00-{trace.root}-{span}-01&#10;baggage: cicd.pipeline.run.id, test.case.name" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="J" target="P">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="1.1: POST /v1/auditmanager/audits&#10;(traceparent)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="P" target="A">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="1.2: publish (PRODUCER)&#10;en-tête Kafka traceparent" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="P" target="K">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="2: process (CONSUMER, enfant du publish)&#10;× ≥ 8 étapes PRODUCER → CONSUMER" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="K" target="S">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="2.1: POST /v1/keymanager/decrypt" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S" target="KM">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="2.2: GET /v1/idgenerator/uin" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S" target="G">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="2.3: POST /idrepository/v1/identity" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="S" target="R">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="2.4: POST /v1/keymanager/encrypt" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="R" target="KM">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="3: BatchSpanProcessor → Export()&#10;OTLP/gRPC :4317 (Resource + spans)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="P" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="3" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="S" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="3" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="R" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="4: OTLP → Tempo" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="C" target="T">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="5: après settle (≥ 40 s, 2 polls stables)&#10;GET /api/traces/{trace.root}&#10;TraceQL { span.test.case.name = &quot;NIN-001&quot; }&#10;5.1: arbre de spans = oracle&#10;(kinds, parents, attributs, aucun status ERROR)&#10;[D : polling jusqu'à preuve complète ; settle 40 s = cible]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="J" target="T">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="3.1: processors du collector&#10;• resource : + deployment.environment.name, cloud.region,&#10;  k8s.cluster.name, oaef.site.role&#10;• tail_sampling (decision_wait 30 s) · batch&#10;• connector spanmetrics → métriques (voir page Metric)&#10;[C : tail_sampling ni dans le démonstrateur, ni dans le starter v0.9]" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="730" width="400" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" style="endArrow=none;dashed=1;html=0;strokeColor=#b0a24f;" edge="1" parent="1" source="n1" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="T2 et T3 : nouveau trace_id, pas de baggage ; reliées par span links, vérifiées en live [D]&#10;• T2 : batch credential (LINK_CREDENTIAL_BATCH)&#10;• T3 : livraison WebSub vers ida-internal (LINK_WEBSUB_DELIVERY)&#10;Sur MOSIP réel : à implémenter (WP0-SW-04)" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1960" y="570" width="420" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="leg" value="Lecture : objets = instances « nom : rôle (span attendu, kind) » · flèches pleines = appels propageant le contexte · flèches pointillées = export OTLP · 1.x dans pkr, 2.x étapes regproc, 3–4 pipeline, 5 vérification oracle." style="text;html=0;whiteSpace=wrap;fontSize=12;fontColor=#555555;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="870" width="1800" height="40" as="geometry" />
+        </mxCell>
+      <mxCell id="st_J" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="286.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_P" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_K" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1306.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_S" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1846.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_KM" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="2346.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_A" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_G" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1846.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_R" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="2346.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_C" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1306.0" y="726.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_T" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="286.0" y="726.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lg_D" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="40.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_D" value="Démontré : signal simulé (S1), lu dans les vrais backends" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="76.0" y="918.0" width="470" height="24" as="geometry" /></mxCell><mxCell id="lg_C" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="560.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_C" value="Cible : pas encore exercé" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="596.0" y="918.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_O" value="O" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#C62828;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="870.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_O" value="Ouvert : décision à prendre" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="906.0" y="918.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_src" value="Statut au 8 nov. 2026 : run CI 42420471946 ; déploiement NIMS 2.0 v0.9 ; WP0 requirements." vertex="1" parent="1" style="text;html=0;fontSize=12;align=left;verticalAlign=middle;fontColor=#555555;"><mxGeometry x="40.0" y="946.0" width="900" height="22" as="geometry" /></mxCell></root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="9BhAhw5npvzrqaWRiD8J" name="Logs">
+    <mxGraphModel dx="3565" dy="2103" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Diagramme de communication — signal OTEL Logs · use case NIN registration (NIN-001, adulte no-hit)" style="text;html=0;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" value="Log suivi : LOG_PKR_RECEIVED (INFO, RID dans le body) émis par regproc-pkr dans le span PKR_SERVER → corrélé à la trace par traceId / spanId" style="text;html=0;fontSize=13;fontColor=#555555;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="58" width="1400" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="L1" value="code : regproc-pkr&#10;(MOSIP logger, SLF4J)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L2" value="appender : Logback OpenTelemetry&#10;(Java agent)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L3" value="ctx : Context courant&#10;(span PKR_SERVER actif)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="560" y="440" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="L4" value="logs : LoggerProvider&#10;(BatchLogRecordProcessor)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="140" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="C" value="gw : Collecteur&#10;(cible : gateway OTel ;&#10;v0.9 : Grafana Alloy, D10-03)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="140" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="LK" value="store : Loki (LogQL)&#10;(démonstrateur mono-tenant ;&#10;v0.9 : tenant assigné par le proxy)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="440" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="J" value="jarvis : Test runner&#10;(oracle NIN-001)" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="2340" y="440" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="T" value="traces : Tempo" style="rounded=0;whiteSpace=wrap;html=0;fontStyle=4;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="2340" y="740" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="1: log.info(« … RID {rid} … »)&#10;(thread dans PKR_SERVER)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="L1" target="L2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="1.1: Span.current()&#10;→ traceId, spanId, flags = 01" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="L2" target="L3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="1.2: emit(LogRecord {&#10; severityNumber = 9 (INFO), body,&#10; traceId, spanId, attributs })" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="L2" target="L4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="2: [batch] Export()&#10;OTLP/gRPC :4317&#10;(Resource service.name, k8s.pod.name)" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="L4" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="3: OTLP/HTTP POST /otlp/v1/logs&#10;(X-Scope-OrgID: app)&#10;[C : X-Scope-OrgID non utilisé dans le démonstrateur]" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="C" target="LK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="4: LogQL {env, site, service_name=~regproc|idrepo|…}&#10;   | trace_id=~trace.ids or mosip_rid=rid&#10;4.1: PKR_RECEIVED ≥ 1 · STAGE_SUCCESS ≥ 8&#10;     · IDREPO_CREATED ≥ 1&#10;4.2: interdits : severity ≥ 17 (ERROR) ; UIN/VID/PII" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="J" target="LK">
+          <mxGeometry x="0.25" relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="5: GET trace(trace_id du log)&#10;log.spanId ∈ sous-arbre PKR_SERVER ✓" style="endArrow=open;endSize=12;html=0;strokeWidth=1.5;fontSize=11;labelBackgroundColor=#ffffff;align=left;" edge="1" parent="1" source="J" target="T">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="2.1: processors du collector&#10;• resource : + deployment.environment.name,&#10;  cloud.region, k8s.cluster.name, oaef.site.role&#10;• redaction PII (UIN, VID, tél., email)&#10;  sauf allow-list notifier · batch&#10;[C : redaction à la gateway ; v0.9 : dans Alloy]" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1920" y="110" width="340" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ln1" style="endArrow=none;dashed=1;html=0;strokeColor=#b0a24f;" edge="1" parent="1" source="n1" target="C">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="3.1: indexation Loki (OTLP)&#10;• labels indexés : service_name, deployment_environment_name,&#10;  cloud_region, oaef_site_role&#10;• trace_id, span_id, severity, attributs → structured metadata" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="600" width="420" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ln2" style="endArrow=none;dashed=1;html=0;strokeColor=#b0a24f;" edge="1" parent="1" source="n2" target="LK">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="Flux audit à part : auditmanager → table mosip_audit.app_audit_log&#10;+ Loki tenant « audit » ({stream=&quot;mosip-audit&quot;}), recoupé par Jarvis avec le SQL&#10;[O : non exécuté (C5) ; v0.9 : jeu de données étiqueté, archive à définir, D11-01]" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="600" width="460" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="leg" value="Lecture : objets = instances « nom : rôle » · flèches pleines = appels in-process ou requêtes · flèches pointillées = export OTLP · 1.x dans le process pkr, 2–3 pipeline, 4–5 vérification oracle." style="text;html=0;whiteSpace=wrap;fontSize=12;fontColor=#555555;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="870" width="1800" height="40" as="geometry" />
+        </mxCell>
+      <mxCell id="n4" value="Ajout V5 : événements métier (WP0-SW-12) [D]&#10;6 types d'événements ordonnés par transaction : packet.received, stage.completed (×9), uin.assigned, identity.activated, credential.issued, notification.sent ; chacun dans son span. NF-04 et NF-05 sont calculés depuis leurs horodatages." vertex="1" parent="1" style="shape=note;whiteSpace=wrap;html=0;size=14;fillColor=#fffde7;strokeColor=#b0a24f;fontSize=11;align=left;spacingLeft=6;"><mxGeometry x="40" y="710" width="940" height="100" as="geometry" /></mxCell><mxCell id="st_L1" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="286.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_L2" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_L3" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="806.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_L4" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1326.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_C" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1826.0" y="126.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_LK" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="1826.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_J" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="2566.0" y="426.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="st_T" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="2566.0" y="726.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lg_D" value="D" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#2E7D32;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="40.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_D" value="Démontré : signal simulé (S1), lu dans les vrais backends" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="76.0" y="918.0" width="470" height="24" as="geometry" /></mxCell><mxCell id="lg_C" value="C" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#B85C00;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="560.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_C" value="Cible : pas encore exercé" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="596.0" y="918.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_O" value="O" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#C62828;strokeColor=none;fontColor=#FFFFFF;fontStyle=1;fontSize=13;align=center;verticalAlign=middle;"><mxGeometry x="870.0" y="918.0" width="30" height="24" as="geometry" /></mxCell><mxCell id="lgt_O" value="Ouvert : décision à prendre" vertex="1" parent="1" style="text;html=0;fontSize=13;align=left;verticalAlign=middle;fontColor=#333333;"><mxGeometry x="906.0" y="918.0" width="270" height="24" as="geometry" /></mxCell><mxCell id="lg_src" value="Statut au 8 nov. 2026 : run CI 42420471946 ; déploiement NIMS 2.0 v0.9 ; WP0 requirements." vertex="1" parent="1" style="text;html=0;fontSize=12;align=left;verticalAlign=middle;fontColor=#555555;"><mxGeometry x="40.0" y="946.0" width="900" height="22" as="geometry" /></mxCell></root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

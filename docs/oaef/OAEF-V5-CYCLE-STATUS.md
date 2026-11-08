@@ -1,7 +1,7 @@
 # OAEF — full-cycle status against the deck (2026-11-07, branch `docs/oaef-v5-model-to-evidence-demo`, after C1)
 
-Question: is the cycle promised by *Observability-First Evidence-Based Testing* (slides 7 "From use case to oracle", 8 "Anatomy of one step", 16 "The loop", 18–35 worked example) implemented end to end?
-**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 36–47).
+Question: is the cycle promised by *Observability-First Evidence-Based Testing* (slides 7 "From use case to oracle", 8 "Anatomy of one step", 16 "The loop", 18–39 worked example) implemented end to end?
+**Answer: half of it, now joined in the middle.** The right half (execute → collect → verify → seal → report) runs for real against Tempo/Loki/Prometheus in GitHub Actions and Codespaces. Since C1 the oracle that runs is **compiled from the specification** (activity model, requirement register, oracle YAML) with requirement and model-element traceability; the hand-written contract survives only as a regression baseline. Still missing on the left: scenario generation from the model (C4), and the step detail that is not signals: REST messages and business rules (C2), spec metrics (C3), DB state and audit (C5). Reference run: GitHub Actions [42420471946](https://github.com/gharbonnier78/mosip-observability-oracles/actions/runs/42420471946), deck section 6 (slides 40–54).
 
 Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated** = in the executed contract, reported `NOT_EVALUATED` · **Specified** = written and reviewed, not executed · **Missing** = neither.
 
@@ -31,14 +31,14 @@ Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated**
 | 5. Verify | Partly executed | per-transaction exactness, span tree and links, values, order, durations, span budgets, metric reconciliation, consequences of a root failure; 6 diagnostic classes produced; the deck's 7 verdict classes (slide 15) not all produced (→ C6) |
 | 6. Seal and learn | Partly | SHA-256 bundle, offline `re-evaluate`, stability page (STABLE/FLAKY); no signature, no WORM storage; feedback to the spec is manual |
 
-## 3. Report and RCA (slides 33–34)
+## 3. Report and RCA (slides 36–37)
 
 | Deck promise | Status | Gap |
 |---|---|---|
-| Per-axis summary: functional, non-functional, signal contract %, audit, verdict | Partly | per-obligation table with requirements and evaluated / failed / not evaluated; no per-axis scores as on slide 33 (→ C6) |
+| Per-axis summary: functional, non-functional, signal contract %, audit, verdict | Partly | per-obligation table with requirements and evaluated / failed / not evaluated; no per-axis scores as on slide 36 (→ C6) |
 | Clause → expected → actual → evidence file | **Executed** | failed checks with requirement refs, oracle versus observed, links to trace, events, sequence |
 | Probable first source + where to look | Partly | root failure and its consequences, links to the exact span; no automatic first-source sentence (→ C6) |
-| RCA mapping verdict → code/config to inspect (slide 34) | Missing | (→ C6) |
+| RCA mapping verdict → code/config to inspect (slide 37) | Missing | (→ C6) |
 | Span graph filtered by business key (slide 31) | Executed per run | span tree with timings, service graph, Grafana; search by NIN hash not demonstrated |
 | Evidence, test management, reuse | **Executed** | campaign zip, Xray Cucumber JSON, Allure, two dashboards as code, Playwright screenshots (35/35), live CI |
 
@@ -52,6 +52,7 @@ Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated**
 | Deck | section 6 added: real run 42420471946, process, specification, injection, validation, evidence screenshots, GenAI vs script, status; slides 18–35 remain the target design (marked illustrative where so) |
 | `OAEF-SPEC-001` / `OAEF-VTS-001` (Word/PDF) | predate V5; not updated (→ C7) |
 | V5 addendum `docs/oaef/OAEF-V5-MODEL-TO-EVIDENCE-ADDENDUM.md` | missing (→ C7) |
+| Signal communication diagrams (Metric, Trace, Logs) | `docs/diagrams/nin-001-signal-communication.drawio`, each element marked demonstrated / target / open; deck slides 33–35 |
 | draw.io pages 3–6 generated from the contract | proposed, not done |
 
 ## 5. Plan to close the cycle
@@ -63,6 +64,6 @@ Legend: **Executed** = run by V5 and checked live · **Compiled, not evaluated**
 | **C3** spec metrics M1–M5, ENV1–2, X1 (baseline/delta) | §1 row 9, loop 1 | each metric assertion of the YAML evaluated live | to do |
 | **C4** model as source (XMI from Modelio) → paths → catalogue scenarios generated | §1 rows 1, 5 | ≥ nominal, dedupe and validation families run; requirement and branch coverage published | to do (needs the XMI export) |
 | **C5** state before/after (DB) and audit, simulated in S1 | §1 row 7, audit, loop 4 | DB and audit checks and faults detected; `missing` becomes decidable | to do |
-| **C6** deck verdict classes, per-axis report, first source, RCA hints | loop 5, §3 | report reproduces slide 33 with real data; slide 34 hints per class | to do |
+| **C6** deck verdict classes, per-axis report, first source, RCA hints | loop 5, §3 | report reproduces slide 36 with real data; slide 37 hints per class | to do |
 | **C7** documentation: V5 addendum, SPEC/VTS update | §4 | documents consistent with the executed system | partly (guide, runbook, deck, process models done) |
 | (later) signing and WORM storage; technical user and vault; S2 on an instrumented MOSIP | loop 6, real SUT | — | to do |
