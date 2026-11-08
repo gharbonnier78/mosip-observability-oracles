@@ -120,6 +120,22 @@ The workflow starts Grafana LGTM (pinned by digest) on the runner, runs the case
 
 **In a Codespace:** `bash validation/demo/run_v5_demo.sh nominal` (Grafana and reports open on ports 3000 and 8080).
 
+**CI or Codespace: same execution, different use.** Both run the same script (`run_v5_demo.sh`), the same compiled contract, the same pinned Grafana LGTM image and the same seeds. So for a given case they give the **same verdict, the same diagnostic class, the same failed checks on the same transaction and the same counts** (e.g. duplicate: FAIL, `OBL-EVENTS-EV_UIN_ASSIGNED:count` TX-017 1 → 2, 2501 records). What differs:
+
+| | CI (GitHub Actions) | Codespace |
+|---|---|---|
+| Purpose | unattended, repeatable campaign; the record of a run | the same campaign plus **human investigation** with the tools still running |
+| Run id, trace ids | new per run (live runs get a unique `run_id` so they never mix in a shared backend; trace ids derive from it) | same rule: different ids from CI, same verdicts |
+| Timings | collection attempts and durations vary with the machine | idem |
+| Grafana links in report and Allure | point to the runner's `localhost:3000`: **dead after the job** | point to the Codespace's forwarded port: **live** while the Codespace runs and Tempo/Loki keep the data |
+| Investigation | from the artifacts: report, Allure, screenshots, offline zip | click through: report or Allure → Tempo span → related logs in Loki → Prometheus histogram → exemplar → back to the trace → dashboards; ad-hoc TraceQL, LogQL, PromQL in Explore |
+| Screenshots | taken automatically (Playwright step) | optional: `capture_screens.py` after `pip install playwright` |
+| Allure | built and zipped | `bash validation/demo/allure_report.sh`, served on port 8080 with live links |
+| Credentials | random Grafana password per job, masked | Codespaces secret `GF_ADMIN_PASSWORD`; the person signs in; ports private |
+| Evidence | sealed bundles in the artifacts | sealed bundles in `/tmp/oaef-v5` (and the zip in `exports/`); download to keep them |
+
+Rule: the **verdict never depends on where it ran**. The Codespace adds people and live tools for investigation; it adds no evidence and changes no verdict. A run to be cited (in a report, a defect, a slide) is a CI run, by its run number; a Codespace run is for exploring and demonstrating.
+
 What `nominal` does: 100 synthetic NIN-001 transactions following the MOSIP flow. Per transaction: trace T1 (Jarvis upload → packet receiver → audit → Kafka → 7 stage groups → keymanager, S3 → ID generator → ID repository → status polls), T2 (credential batch, span link to T1) and T3 (IDA callback, link to T2): **42 spans over 15 services, 25 log records of which 14 business events**, plus the journey histogram and per-service HTTP metrics. Every signal carries `oaef.run.id`, `oaef.transaction.id`, `deployment.environment.name`, `cloud.region`.
 
 ## 5. Step 4 — Inject faults (script)
