@@ -116,7 +116,7 @@ gh run watch <run-id> --exit-status
 gh run download <run-id> -n oaef-v5-campaign-zip
 ```
 
-The workflow starts Grafana LGTM (pinned by digest) on the runner, runs the cases, builds Allure, takes the screenshots, builds the zip and uploads two artifacts: **oaef-v5-reports** and **oaef-v5-campaign-zip**. About 6 minutes.
+The workflow starts Grafana LGTM (pinned by digest) on the runner, runs the cases, builds Allure, takes the screenshots, builds the zip and uploads two artifacts: **oaef-v5-reports** and **oaef-v5-campaign-zip**. About 10 minutes for all cases (run 42420471946: 10 min 36 s).
 
 **In a Codespace:** `bash validation/demo/run_v5_demo.sh nominal` (Grafana and reports open on ports 3000 and 8080).
 
